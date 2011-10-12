@@ -1,0 +1,100 @@
+.inside {
+    overflow:hidden;
+}
+.plugin, .theme {
+    float:left;
+    width:300px;
+    padding:10px 7px;
+}
+.plugin:hover, .theme:hover{
+    background:#f5f5f5;
+} 
+.plugin .logo {
+    float:left;
+    margin-top:10px;
+}
+.plugin .title, .theme .title{
+    display:block;
+    margin-top:3px;
+    font-size:15px;
+    font-weight:bold;
+    margin-left:80px;
+}
+.plugin .category, .theme .category{
+    display:block;
+    margin-top:8px;
+    color:#666;
+    margin-left:80px;
+}
+.plugin .rating, .theme .rating {
+    margin-top:8px;
+    line-height:20px;
+    display:block;
+    margin-left:78px;
+    padding-left:95px;
+    color:#999;
+}
+.plugin .buyoptions, .theme .buyoptions{
+    display:block;
+    margin-left:80px;
+    margin-top:8px;
+}
+.plugin .buyoptions a, .theme .buyoptions a{
+    display:block;
+    width:75px;
+    text-align:center;
+    font-weight:bold;
+    color:#777;
+}
+.plugin .star1, .theme .star1, .star1{
+    background: transparent url('images/1star.png') no-repeat;
+}
+.plugin .star2, .theme .star2, .star2{  
+    background: transparent url('images/2star.png') no-repeat;
+}                                                 
+.plugin .star3, .theme .star3, .star3{                    
+    background: transparent url('images/3star.png') no-repeat;
+}                                                 
+.plugin .star4, .theme .star4, .star4{                    
+    background: transparent url('images/4star.png') no-repeat;
+}                                                 
+.plugin .star5, .theme .star5, .star5{                    
+    background: transparent url('images/5star.png') no-repeat;
+}
+.theme .title, .theme .category, .theme .buyoptions, .theme .buyoptions{
+    margin-left:10px;
+}
+.theme .rating{
+    margin-left:8px; 
+}
+.theme .buyoptions{
+    float:right;
+    margin-right:10px;
+    margin-top:0px;
+}
+.theme .scrot {
+    margin: 10px 0 10px 10px;
+}
+
+.general_info {
+    overflow:hidden;
+    margin-bottom:20px;
+}
+.general_info h2 {
+    display:inline;
+}
+.logo_and_buy_button{
+    float:left;
+    margin:10px 35px 10px 20px;
+}
+.logo_and_buy_button .logo{
+    display:block;
+    margin-bottom:20px;
+}
+.description, .latest_changes {
+    margin-left:125px;
+}
+.description ul, .latest_changes ul{
+    list-style-type: circle !important;
+    margin-left:15px;
+}
