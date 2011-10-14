@@ -7,8 +7,10 @@ Author: Lifeisgoodlabs
 Version: 0.7.1
 Author URI: http://www.ultimateblogsecurity.com
 */
-// require_once(ABSPATH . 'wp-admin/includes/plugin.php');
-// include_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+
+ require_once(ABSPATH . 'wp-admin/includes/plugin.php');
+if ( ! class_exists('WP_Upgrader') )
+ include_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
 class WPAppStore_Upgrader_Skin {
 
 	var $upgrader;
@@ -112,8 +114,7 @@ class WPAppstore_Plugin_Installer_Skin extends WPAppStore_Upgrader_Skin {
 		if ( !empty($this->api) )
 			$this->upgrader->strings['process_success'] = sprintf( __('Successfully installed the plugin <strong>%s %s</strong>.'), $this->api->name, $this->api->version);
             $appstore = new WP_AppStore();
-            $appstore->request_counter(array('extension' => intval($_GET['plugin_id']), 'website' => site_url()));
-	}
+    }
 
 	function after() {
 
@@ -236,15 +237,28 @@ function json_encode( $data ) {
     return $json; 
 }
 }
-if ( ! class_exists('WP_Http') )
-    require( ABSPATH . WPINC . '/class-http.php' );
 class WP_AppStore{
     public $http;
     public $installed_plugins;
-    public $api = 'http://api.wp-appstore.com/api';
+    public $ini_files;
+    public $formulas;
+    public $dir;
+    
     function WP_AppStore(){
         $this->http = new WP_Http();
         $this->installed_plugins = $this->get_installed_plugins();
+        $this->dir = rtrim(dirname(__FILE__), '/\\') . DIRECTORY_SEPARATOR . 'formulas';
+        $this->recurse_directory($this->dir);
+        $this->read_formulas();
+        //$this->store();
+    }
+    function store() {
+        if (sizeof($this->ini_files) > 0) {
+            update_option('wp_appstore_ini_cashe', $this->ini_files);
+        }
+        if (sizeof($this->formulas) > 0) {
+            update_option('wp_appstore_formulas_cashe', $this->formulas);
+        }
     }
     function get_installed_plugins() {
     	$dir = WP_PLUGIN_DIR;
@@ -260,6 +274,31 @@ class WP_AppStore{
 
     	return $plugin_files;
     }
+    public function recurse_directory( $dir ) {
+		if ( $handle = @opendir( $dir ) ) {
+			while ( false !== ( $file = readdir( $handle ) ) ) {
+				if ( $file != '.' && $file != '..' ) {
+					$file = $dir . DIRECTORY_SEPARATOR . $file;
+					if ( is_dir( $file ) ) {
+						$this->recurse_directory( $file );
+					} elseif ( is_file( $file ) ) {
+						$this->ini_files[] = $file;
+					}
+				}
+			}
+			closedir( $handle );
+		}
+	}
+    
+    public function read_formulas() {
+        if (sizeof($this->ini_files) > 0) {
+            foreach ($this->ini_files as $file) {
+                $tm = parse_ini_file($file);
+                $this->formulas[$tm['type']][$tm['id']] = (object)$tm; // Actually, we should make a dynamic id based on array key
+            }
+        }
+    }
+    
     function admin_url( $args = null ) {
         
         // $url = menu_page_url( basename( __FILE__ ), false );
@@ -269,38 +308,16 @@ class WP_AppStore{
     	return $url;
     }
     public function get_plugins(){
-        $params = array(
-            'log' => '123123123123123',
-            'pwd' => '123123123123123'
-        );
-        $response = (array)$this->http->request($this->api.'/plugins/',array( 'method' => 'GET'));
-        return json_decode($response['body']);
-    }
-    /*
-    params shoudl be array with next vars extension, website
-    */
-    public function request_counter($params = array()){
-        if($params == array()){
-            return False;
-        }
-        $response = (array)$this->http->request($this->api.'/plugins/',array( 'method' => 'POST', 'body' => $params));
-        return json_decode($response['body']);
+        return $this->formulas['plugin'];
     }
     public function get_plugin($id){
-        $response = (array)$this->http->request($this->api.'/plugin/'. $id .'/',array( 'method' => 'GET'));
-        return json_decode($response['body']);
+        return $this->formulas['plugin'][$id];
     }
     public function get_themes(){
-        $params = array(
-            'log' => '123123123123123',
-            'pwd' => '123123123123123'
-        );
-        $response = (array)$this->http->request($this->api.'/themes/',array( 'method' => 'GET'));
-        return json_decode($response['body']);
+        return $this->formulas['theme'];
     }
     public function get_theme($id){
-        $response = (array)$this->http->request($this->api.'/theme/'. $id .'/',array( 'method' => 'GET'));
-        return json_decode($response['body']);
+        return $this->formulas['theme'][$id];
     }
 }
 function wp_appstore_admin_init() {
@@ -319,8 +336,8 @@ function wp_appstore_admin_menu() {
 function wp_appstore_page_store(){
     $appstore = new WP_AppStore();
     $plugins = $appstore->get_plugins();
-    $themes = $appstore->get_themes();
     ?>
+
     <div class="wrap">
         <?php screen_icon( 'plugins' );?>
         <h2>WP AppStore
@@ -554,7 +571,7 @@ Please enter your email below and we will notify you when you can download an up
                             <ul style="margin-left:10px;font-weight:bold;">
                                 <li>Released: <?php echo date('d M, Y', strtotime($plugin_info->updated));?></li>
                                 <li>Version: <?php echo $plugin_info->version; ?></li>
-                                <li>Category: <a href="#"><?php echo $plugin_info->category->title; ?></a></li>
+                                <li>Category: <a href="#"><?php echo $plugin_info->category_title; ?></a></li>
                                 <li>Rating: <span class="star<?php echo $plugin_info->rating; ?>" style="padding-left:95px;color:#999;"><?php echo $plugin_info->votes; ?> ratings</span></li>
                                 <li></li>
                             </ul>
@@ -592,7 +609,7 @@ Please enter your email below and we will notify you when you can download an up
                         <div class="inside">
                         <div id="slider" class="nivoSlider">
                             <?php foreach($plugin_info->screenshots as $one): ?>
-                            <img src="<?php echo $one->file ?>" alt="" />
+                            <img src="<?php echo $one ?>" alt="" />
                         <?php endforeach; ?>
                         </div>
                         <div id="htmlcaption" class="nivo-html-caption">
@@ -652,7 +669,7 @@ Please enter your email below and we will notify you when you can download an up
                             <ul style="margin-left:10px;font-weight:bold;">
                                 <li>Released: <?php echo date('d M, Y', strtotime($theme_info->updated));?></li>
                                 <li>Version: <?php echo $theme_info->version;?></li>
-                                <li>Category: <a href="#"><?php echo $theme_info->category->title;?></a></li>
+                                <li>Category: <a href="#"><?php echo $theme_info->category_title;?></a></li>
                                 <li>Rating: <span class="star<?php echo $theme_info->rating;?>" style="padding-left:95px;color:#999;"><?php echo $theme_info->votes;?> ratings</span></li>
                                 <li></li>
                             </ul>
@@ -691,9 +708,9 @@ Please enter your email below and we will notify you when you can download an up
                     <div id="namediv" class="stuffbox">
                         <h3><label for="link_name">Screenshots</label></h3>
                         <div class="inside">
-                        <div id="slider" class="nivoSlider">
+                        <div id="nivo-slider" class="nivoSlider">
                             <?php foreach($theme_info->screenshots as $one): ?>
-                            <img src="<?php echo $one->file ?>" alt="" />
+                            <img src="<?php echo $one ?>" alt="" />
                         <?php endforeach; ?>
                         </div>
                         <div id="htmlcaption" class="nivo-html-caption">
@@ -702,7 +719,7 @@ Please enter your email below and we will notify you when you can download an up
                         </div>
                         <script type="text/javascript">
                         jQuery(window).load(function() {
-                            jQuery('#slider').nivoSlider({effect:'sliceDownRight',animSpeed:500, pauseTime:7500});
+                            jQuery('#nivo-slider').nivoSlider({effect:'sliceDownRight',animSpeed:500, pauseTime:7500});
                         });
                         </script>
                     </div>
@@ -798,5 +815,4 @@ function wp_appstore_myaccount() {
 
 add_action('admin_init', 'wp_appstore_admin_init');
 add_action('admin_menu', 'wp_appstore_admin_menu');
-
 ?>
