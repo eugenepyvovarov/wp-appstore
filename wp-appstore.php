@@ -247,10 +247,19 @@ class WP_AppStore{
     function WP_AppStore(){
         $this->http = new WP_Http();
         $this->installed_plugins = $this->get_installed_plugins();
-        $this->dir = rtrim(dirname(__FILE__), '/\\') . DIRECTORY_SEPARATOR . 'formulas';
-        $this->recurse_directory($this->dir);
-        $this->read_formulas();
-        //$this->store();
+        $this->set_formulas();
+    }
+    function set_formulas(){
+        if (get_option('wp_appstore_formulas_rescan', true)) {
+            $this->dir = rtrim(dirname(__FILE__), '/\\') . DIRECTORY_SEPARATOR . 'formulas';
+            $this->recurse_directory($this->dir);
+            $this->read_formulas();
+            $this->store();
+        }else{
+            $this->ini_files = get_option('wp_appstore_ini_cashe');
+            $this->formulas = get_option('wp_appstore_formulas_cashe');
+        }
+        
     }
     function store() {
         if (sizeof($this->ini_files) > 0) {
@@ -293,9 +302,12 @@ class WP_AppStore{
     public function read_formulas() {
         if (sizeof($this->ini_files) > 0) {
             foreach ($this->ini_files as $file) {
-                $tm = parse_ini_file($file);
-                $this->formulas[$tm['type']][$tm['id']] = (object)$tm; // Actually, we should make a dynamic id based on array key
+                if (preg_match('|\.ini$|', $file)) {
+                    $tm = parse_ini_file($file);
+                    $this->formulas[$tm['type']][$tm['id']] = (object)$tm; // Actually, we should make a dynamic id based on array key
+                }
             }
+        update_option('wp_appstore_formulas_rescan', false);    
         }
     }
     
@@ -336,6 +348,11 @@ function wp_appstore_admin_menu() {
 function wp_appstore_page_store(){
     $appstore = new WP_AppStore();
     $plugins = $appstore->get_plugins();
+    $themes = $appstore->get_themes();
+    //wp_appstore_update_formulas();
+    //var_dump(get_option('wp_appstore_formulas_rescan'));
+    //var_dump(get_option('wp_appstore_ini_cashe'));
+    //var_dump(get_option('wp_appstore_formulas_cashe'));
     ?>
 
     <div class="wrap">
@@ -812,7 +829,68 @@ function wp_appstore_main() {
 function wp_appstore_myaccount() {
     echo "456";
 }
+function get_tmp_path(){
+    if ( defined('WP_TEMP_DIR') ){
+        $path = rtrim(WP_TEMP_DIR, '/');
+		return $path.'/';
+    }
 
+	$temp = ini_get('upload_tmp_dir');
+	if ( is_dir($temp) && @is_writable($temp) ){
+		$path = rtrim($temp, '/');
+		return $path.'/';
+    }
+    
+    $temp = WP_CONTENT_DIR . '/';
+	if ( is_dir($temp) && @is_writable($temp) )
+		return $temp;
+    return false;
+}
+
+
+function wp_appstore_update_formulas() {
+    if (!get_tmp_path()) {
+        wp_die(__('You do not have sufficient permissions to update formulas on this site.'));
+    }
+    $tmp_file_name = get_tmp_path().'tmp.zip';
+    $download_url = "https://github.com/bsn/wp-appstore/zipball/master";
+    $file = file_get_contents($download_url);
+    file_put_contents($tmp_file_name, $file);
+    
+    $path = WP_PLUGIN_DIR.DIRECTORY_SEPARATOR.'wp-appstore'.DIRECTORY_SEPARATOR.'formulas';
+    
+    
+    
+    $zip = zip_open($tmp_file_name);
+    if (is_resource($zip)) {
+        
+      while ($zip_entry = zip_read($zip)) {
+        if (zip_entry_open($zip, $zip_entry, "r")) {
+          $buf = zip_entry_read($zip_entry, zip_entry_filesize($zip_entry));
+          if(preg_match('|\.ini$|', zip_entry_name($zip_entry))){
+            $filename = strrchr(zip_entry_name($zip_entry),'/');
+            @file_put_contents($path.$filename,$buf);
+          } 
+          zip_entry_close($zip_entry);
+        }
+      }
+      zip_close($zip);
+    }else{
+        wp_die(__('We have an error while updating formulas files.'));
+    }
+    unlink($tmp_file_name);
+    update_option('wp_appstore_formulas_rescan', true);
+}
+
+function wp_appstore_activation() {
+	wp_schedule_event(time(), 'daily', 'wp_appstore_daily_event');
+}
+function wp_appstore_deactivation() {
+	wp_clear_scheduled_hook('wp_appstore_daily_event');
+}
 add_action('admin_init', 'wp_appstore_admin_init');
 add_action('admin_menu', 'wp_appstore_admin_menu');
+add_action('wp_appstore_daily_event', 'wp_appstore_update_formulas');
+register_activation_hook(__FILE__, 'wp_appstore_activation');
+register_deactivation_hook(__FILE__, 'wp_appstore_deactivation');
 ?>
