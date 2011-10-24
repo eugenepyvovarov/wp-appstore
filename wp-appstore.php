@@ -151,7 +151,64 @@ class WPAppstore_Plugin_Installer_Skin extends WPAppStore_Upgrader_Skin {
 			$this->feedback(implode(' | ', (array)$install_actions));
 	}
 }
+class WPAppstore_Theme_Installer_Skin extends WPAppStore_Upgrader_Skin {
+	var $api;
+	var $type;
+    
+    function Theme_Installer_Skin($args = array()) {
+		return $this->__construct($args);
+	}
 
+	function __construct($args = array()) {
+		$defaults = array( 'type' => 'web', 'url' => '', 'theme' => '', 'nonce' => '', 'title' => '' );
+		$args = wp_parse_args($args, $defaults);
+
+		$this->type = $args['type'];
+		$this->api = isset($args['api']) ? $args['api'] : array();
+
+		parent::__construct($args);
+	}
+
+	function before() {
+		if ( !empty($this->api) ) {
+			/* translators: 1: theme name, 2: version */
+			$this->upgrader->strings['process_success'] = sprintf( __('Successfully installed the theme <strong>%1$s %2$s</strong>.'), $this->api->name, $this->api->version);
+		}
+        $appstore = new WP_AppStore();
+	}
+
+	function after() {
+		if ( empty($this->upgrader->result['destination_name']) )
+			return;
+
+		$theme_info = $this->upgrader->theme_info();
+		if ( empty($theme_info) )
+			return;
+		$name = $theme_info['Name'];
+		$stylesheet = $this->upgrader->result['destination_name'];
+		$template = !empty($theme_info['Template']) ? $theme_info['Template'] : $stylesheet;
+
+		$preview_link = htmlspecialchars( add_query_arg( array('preview' => 1, 'template' => $template, 'stylesheet' => $stylesheet, 'preview_iframe' => 1, 'TB_iframe' => 'true' ), trailingslashit(esc_url(get_option('home'))) ) );
+		$activate_link = wp_nonce_url("themes.php?action=activate&amp;template=" . urlencode($template) . "&amp;stylesheet=" . urlencode($stylesheet), 'switch-theme_' . $template);
+
+		$install_actions = array(
+			'preview' => '<a href="' . $preview_link . '" class="thickbox thickbox-preview" title="' . esc_attr(sprintf(__('Preview &#8220;%s&#8221;'), $name)) . '">' . __('Preview') . '</a>',
+			'activate' => '<a href="' . $activate_link .  '" class="activatelink" title="' . esc_attr( sprintf( __('Activate &#8220;%s&#8221;'), $name ) ) . '">' . __('Activate') . '</a>'
+							);
+
+		if ( $this->type == 'web' )
+			$install_actions['plugins_page'] = '<a href="' . admin_url('admin.php') . '?page=wp-appstore.php" title="' . esc_attr__('Return to WP AppStore') . '" target="_parent">' . __('Return to WP AppStore') . '</a>';
+		else
+			$install_actions['themes_page'] = '<a href="' . self_admin_url('themes.php') . '" title="' . esc_attr__('Themes page') . '" target="_parent">' . __('Return to Themes page') . '</a>';
+
+		if ( ! $this->result || is_wp_error($this->result) || is_network_admin() )
+			unset( $install_actions['activate'], $install_actions['preview'] );
+
+		$install_actions = apply_filters('install_theme_complete_actions', $install_actions, $this->api, $stylesheet, $theme_info);
+		if ( ! empty($install_actions) )
+			$this->feedback(implode(' | ', (array)$install_actions));
+	}
+}
 if ( !function_exists('json_decode') ){
 function json_decode($json)
 {
@@ -240,6 +297,7 @@ function json_encode( $data ) {
 class WP_AppStore{
     public $http;
     public $installed_plugins;
+    public $installed_themes;
     public $ini_files;
     public $formulas;
     public $dir;
@@ -247,27 +305,19 @@ class WP_AppStore{
     function WP_AppStore(){
         $this->http = new WP_Http();
         $this->installed_plugins = $this->get_installed_plugins();
+        $this->get_installed_themes();
         $this->set_formulas();
     }
     function set_formulas(){
+
         if (get_option('wp_appstore_formulas_rescan', true)) {
             $this->dir = rtrim(dirname(__FILE__), '/\\') . DIRECTORY_SEPARATOR . 'formulas';
             $this->recurse_directory($this->dir);
-            $this->read_formulas();
             $this->store();
         }else{
-            $this->ini_files = get_option('wp_appstore_ini_cashe');
-            $this->formulas = get_option('wp_appstore_formulas_cashe');
+            $this->get_formulas_from_db();
         }
         
-    }
-    function store() {
-        if (sizeof($this->ini_files) > 0) {
-            update_option('wp_appstore_ini_cashe', $this->ini_files);
-        }
-        if (sizeof($this->formulas) > 0) {
-            update_option('wp_appstore_formulas_cashe', $this->formulas);
-        }
     }
     function get_installed_plugins() {
     	$dir = WP_PLUGIN_DIR;
@@ -282,6 +332,14 @@ class WP_AppStore{
 		}
 
     	return $plugin_files;
+    }
+    function get_installed_themes() {
+        
+        $this->installed_themes = array();
+        $themes = get_themes();
+        foreach ($themes as $theme) {
+            $this->installed_themes[] = $theme['Template'];
+        }
     }
     public function recurse_directory( $dir ) {
 		if ( $handle = @opendir( $dir ) ) {
@@ -299,12 +357,309 @@ class WP_AppStore{
 		}
 	}
     
-    public function read_formulas() {
+    function convert_escaped_quotes($str){
+        $str = str_replace("&#039;", "'", $str);
+        $str = str_replace("&quot;", '"', $str);
+        return $str;
+    }
+    
+    function str_to_float($str){
+        $version = explode('-', $str);
+        $version = explode('.', $version[0]);
+        $ver = $version[0].'.';
+        array_shift($version);
+        $ver = $ver . implode($version);
+        return floatval($ver);
+    }
+    
+    function check_compatibility($ver){
+        global $wp_version;
+        if (strlen ($ver) <= 1) {
+            return false;
+        }        
+        
+        $current = $this->str_to_float($wp_version);
+        $requird = $this->str_to_float($ver);
+        
+        if ($current >= $requird) {
+            return true;
+        }else{
+            return false;
+        }
+        
+    }
+    
+    function get_formulas_from_db(){
+        global $wpdb;
+        
+        $query = "SELECT * FROM ".$wpdb->prefix."appstore_plugins";
+        $stored_plugins_result = $wpdb->get_results($query, ARRAY_A);
+        foreach ($stored_plugins_result as $tmp) {
+            $query = "SELECT `screenshot` FROM ".$wpdb->prefix."appstore_screenshots WHERE plugin_id =".$tmp['id'];
+            $screenshots = $wpdb->get_results($query);
+            if (sizeof($screenshots) > 0) {
+                foreach ($screenshots as $ss) {
+                    $tmp['screenshots'][] = $ss->screenshot;
+                }
+            }
+            
+            $query = "SELECT `tag` FROM ".$wpdb->prefix."appstore_plugins_tags WHERE plugin_id =".$tmp['id'];
+            $tags = $wpdb->get_results($query);
+            if (sizeof($tags)>0) {
+                foreach ($tags as $tag) {
+                    $tmp['tags'][] = $tag->tag;
+                }
+            }
+            
+            $this->formulas['plugin'][$tmp['id']] = (object)$tmp;
+            unset($screenshots, $tags, $ss, $tag);
+        }
+        
+        
+        $query = "SELECT * FROM ".$wpdb->prefix."appstore_themes";
+        $stored_themes_result = $wpdb->get_results($query, ARRAY_A);
+        foreach ($stored_themes_result as $tmp) {
+            $query = "SELECT `screenshot` FROM ".$wpdb->prefix."appstore_screenshots WHERE theme_id =".$tmp['id'];
+            $screenshots = $wpdb->get_results($query);
+            if (sizeof($screenshots) > 0) {
+                foreach ($screenshots as $ss) {
+                    $tmp['screenshots'][] = $ss->screenshot;
+                }
+            }
+            $query = "SELECT `tag` FROM ".$wpdb->prefix."appstore_themes_tags WHERE theme_id =".$tmp['id'];
+            $tags = $wpdb->get_results($query);
+            if (sizeof($tags)>0) {
+                foreach ($tags as $tag) {
+                    $tmp['tags'][] = $tag->tag;
+                }
+            }
+            
+            $this->formulas['theme'][$tmp['id']] = (object)$tmp;
+            unset($screenshots, $tags, $ss, $tag);
+        }
+        return $out;  
+    }
+//set formulas to db    
+    function store(){
+        global $wpdb;
         if (sizeof($this->ini_files) > 0) {
+            //start
+            //get existing extensions
+            $query = "SELECT `id`, `slug` FROM ".$wpdb->prefix."appstore_plugins";
+            $stored_plugins_result = $wpdb->get_results($query, ARRAY_A);
+            foreach ($stored_plugins_result as $tmp) {
+                $stored_plugins[$tmp['slug']] = $tmp['id'];
+            }
+            $query = "SELECT `id`, `slug` FROM ".$wpdb->prefix."appstore_themes";
+            $stored_themes_result = $wpdb->get_results($query, ARRAY_A);
+            foreach ($stored_plugins_result as $tmp) {
+                $stored_themes[$tmp['slug']] = $tmp['id'];
+            }
+            //start ini files loop
             foreach ($this->ini_files as $file) {
                 if (preg_match('|\.ini$|', $file)) {
                     $tm = parse_ini_file($file);
-                    $this->formulas[$tm['type']][$tm['id']] = (object)$tm; // Actually, we should make a dynamic id based on array key
+                    if ( ($tm['type'] == 'theme') || ($this->check_compatibility($tm['requires']))) {
+                        $tm['description'] = $this->convert_escaped_quotes($tm['description']);
+                        $tm['author'] = $this->convert_escaped_quotes($tm['author']);
+                        
+                        $tags = $tm['tags'];
+                        unset($tm['tags']);
+                        $screenshots = $tm['screenshots'];
+                        unset($tm['screenshots']);
+                        
+//Insert new themes                        
+                        if (($tm['type'] == 'theme') && (!isset($stored_themes[$tm['slug']]))) {
+                            unset($tm['type']);
+                            $wpdb->insert(  
+                                $wpdb->prefix."appstore_themes",  
+                                $tm,  
+                                array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' )  
+                            );
+                            
+                            $theme_id = $wpdb->insert_id;
+                            $dump[] = $theme_id;
+                            $wpdb->flush();
+                            if (is_array($screenshots)) {
+                                foreach($screenshots as $screenshot){
+                                    $query = $wpdb->prepare(
+                                    "INSERT IGNORE INTO ".$wpdb->prefix."appstore_screenshots "
+                                    ."(theme_id, screenshot) VALUES "
+                                    ."(%d, %s)", $theme_id, $screenshot  
+                                    );
+                                    $wpdb->query($query);
+                                    
+                                }
+                            }
+                            if (is_array($tags)) {
+                                foreach ($tags as $tag) {
+                                    $query = $wpdb->prepare(
+                                    "INSERT IGNORE INTO ".$wpdb->prefix."appstore_themes_tags "
+                                    ."(theme_id, tag) VALUES "
+                                    ."(%d, %s)", $theme_id, $tag  
+                                    );
+                                    $wpdb->query($query);
+                                }
+                            }
+                        }
+//Update existing themes
+                        if (($tm['type'] == 'theme') && (isset($stored_themes[$tm['slug']]))) {
+                            $theme_id = $stored_themes[$tm['slug']];
+                            unset($stored_themes[$tm['slug']]);
+                                $wpdb->update(
+                                    $wpdb->prefix."appstore_themes",  
+                                    $tm,  
+                                    array( 'id' => $theme_id),  
+                                    array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' ),  
+                                    array( '%d' )  
+                                );
+                                
+                             if (is_array($screenshots)) {
+                                $query = $wpdb->prepare("DELETE FROM ".$wpdb->prefix."appstore_screenshots WHERE theme_id=%d", $theme_id);
+                                $wpdb->query($query);
+                                foreach($screenshots as $screenshot){
+                                    $query = $wpdb->prepare(
+                                    "INSERT IGNORE INTO ".$wpdb->prefix."appstore_screenshots "
+                                    ."(theme_id, screenshot) VALUES "
+                                    ."(%d, %s)", $theme_id, $screenshot  
+                                    );
+                                    $wpdb->query($query);
+                                    
+                                }
+                            }
+                            if (is_array($tags)) {
+                                $query = $wpdb->prepare("DELETE FROM ".$wpdb->prefix."appstore_themes_tags WHERE theme_id=%d", $theme_id);
+                                $wpdb->query($query);
+                                foreach ($tags as $tag) {
+                                    $query = $wpdb->prepare(
+                                    "INSERT IGNORE INTO ".$wpdb->prefix."appstore_themes_tags "
+                                    ."(theme_id, tag) VALUES "
+                                    ."(%d, %s)", $theme_id, $tag  
+                                    );
+                                    $wpdb->query($query);
+                                }
+                            } 
+                        }
+
+//Insert new plugins                        
+                        if (($tm['type'] == 'plugin') && (!isset($stored_plugins[$tm['slug']]))) {
+                            unset($tm['type']);
+                            $wpdb->insert(  
+                                $wpdb->prefix."appstore_plugins",  
+                                $tm,  
+                                array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' )  
+                            );
+
+                            $plugin_id = $wpdb->insert_id;
+                            $wpdb->flush(); 
+                            if (is_array($screenshots)) {
+                                foreach($screenshots as $screenshot){
+                                    $query = $wpdb->prepare(
+                                    "INSERT IGNORE INTO ".$wpdb->prefix."appstore_screenshots "
+                                    ."(plugin_id, screenshot) VALUES "
+                                    ."(%d, %s)", $plugin_id, $screenshot  
+                                    );
+                                    $wpdb->query($query);
+                                    
+                                }
+                            }
+                            if (is_array($tags)) {
+                                foreach ($tags as $tag) {
+                                    $query = $wpdb->prepare(
+                                    "INSERT IGNORE INTO ".$wpdb->prefix."appstore_plugins_tags "
+                                    ."(plugin_id, tag) VALUES "
+                                    ."(%d, %s)", $plugin_id, $tag  
+                                    );
+                                    $wpdb->query($query);
+                                }
+                            }
+                        }
+//Update existing plugins                        
+                        if (($tm['type'] == 'plugin') && (isset($stored_themes[$tm['slug']]))) {
+                            $plugin_id = $stored_plugins[$tm['slug']];
+                            unset($stored_plugins[$tm['slug']]);
+                                $wpdb->update(
+                                    $wpdb->prefix."appstore_plugins",  
+                                    $tm,
+                                    array( 'id' => $plugin_id),  
+                                    array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' ),  
+                                    array( '%d' )  
+                                );
+                                
+                            if (is_array($screenshots)) {
+                                $query = $wpdb->prepare("DELETE FROM ".$wpdb->prefix."appstore_screenshots WHERE plugin_id=%d", $plugin_id);
+                                $wpdb->query($query);
+                                foreach($screenshots as $screenshot){
+                                    $query = $wpdb->prepare(
+                                    "INSERT IGNORE INTO ".$wpdb->prefix."appstore_screenshots "
+                                    ."(plugin_id, screenshot) VALUES "
+                                    ."(%d, %s)", $plugin_id, $screenshot  
+                                    );
+                                    $wpdb->query($query);
+                                    
+                                }
+                            }
+                            if (is_array($tags)) {
+                                $query = $wpdb->prepare("DELETE FROM ".$wpdb->prefix."appstore_plugins_tags WHERE plugin_id=%d", $plugin_id);
+                                $wpdb->query($query);
+                                foreach ($tags as $tag) {
+                                    $query = $wpdb->prepare(
+                                    "INSERT IGNORE INTO ".$wpdb->prefix."appstore_plugins_tags "
+                                    ."(plugin_id, tag) VALUES "
+                                    ."(%d, %s)", $plugin_id, $tag  
+                                    );
+                                    $wpdb->query($query);
+                                }
+                            }  
+                        }
+                        
+                             
+                        $id = $tm['type'].'_id';
+                        $this->formulas[$tm['type']][$$id] = (object)$tm;
+                    }
+                }
+            }
+//delete deprecated themes and plugins
+            if (sizeof($stored_plugins) > 0) {
+                foreach ($stored_plugins as $id) {
+                    $query = $wpdb->prepare("DELETE FROM ".$wpdb->prefix."appstore_plugins WHERE id=%d", $id);
+                    $wpdb->query($query);
+                    $query = $wpdb->prepare("DELETE FROM ".$wpdb->prefix."appstore_screenshots WHERE plugin_id=%d", $id);
+                    $wpdb->query($query);
+                    $query = $wpdb->prepare("DELETE FROM ".$wpdb->prefix."appstore_plugins_tags WHERE plugin_id=%d", $id);
+                    $wpdb->query($query);
+                }
+            }
+            if (sizeof($stored_themes) > 0) {
+                foreach ($stored_themes as $id) {
+                    $query = $wpdb->prepare("DELETE FROM ".$wpdb->prefix."appstore_themes WHERE id=%d", $id);
+                    $wpdb->query($query);
+                    $query = $wpdb->prepare("DELETE FROM ".$wpdb->prefix."appstore_screenshots WHERE theme_id=%d", $id);
+                    $wpdb->query($query);
+                    $query = $wpdb->prepare("DELETE FROM ".$wpdb->prefix."appstore_themes_tags WHERE theme_id=%d", $id);
+                    $wpdb->query($query);
+                }
+            }
+        update_option('wp_appstore_formulas_rescan', false);    
+        }
+        return $dump;
+    }
+    
+    public function read_formulas() {
+        if (sizeof($this->ini_files) > 0) {
+            $id = 1;
+            foreach ($this->ini_files as $file) {
+                if (preg_match('|\.ini$|', $file)) {
+                    $tm = parse_ini_file($file);
+                    if ( ($tm['type'] == 'theme') || ($this->check_compatibility($tm['requires']))) {
+                        $tm['id'] = $id;
+                        $tm['description'] = $this->convert_escaped_quotes($tm['description']);
+                        $tm['author'] = $this->convert_escaped_quotes($tm['author']);
+                        
+                        
+                        $this->formulas[$tm['type']][$id] = (object)$tm;
+                        $id++;
+                    }
                 }
             }
         update_option('wp_appstore_formulas_rescan', false);    
@@ -349,10 +704,9 @@ function wp_appstore_page_store(){
     $appstore = new WP_AppStore();
     $plugins = $appstore->get_plugins();
     $themes = $appstore->get_themes();
+
+    //var_dump(wp_appstore_myaccount());
     //wp_appstore_update_formulas();
-    //var_dump(get_option('wp_appstore_formulas_rescan'));
-    //var_dump(get_option('wp_appstore_ini_cashe'));
-    //var_dump(get_option('wp_appstore_formulas_cashe'));
     ?>
 
     <div class="wrap">
@@ -366,6 +720,17 @@ function wp_appstore_page_store(){
 		</h2>
         <div id="poststuff" class="metabox-holder has-right-sidebar" style="max-width:950px;min-width:640px;">
         <div id="side-info-column" class="inner-sidebar draggable">
+            <?php if(get_option('wp_appstore_autoupdate_request')): ?>
+            <div id="" class="postbox " style="">
+                <h3 class="hndle"><span>Update Avaliable!</span></h3>
+                <div class="inside">
+                    <p>New update for this plugin now avaliable!</p>
+                    <p style="text-align: center;">
+                    <span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'autoupdate')));?>" class="button rbutton" title="Update It Now">Get Update Now!</a></span>
+                    </p>
+                </div>
+            </div>  
+            <?php endif; ?>
             <div id="" class="postbox " style="">
                 <h3 class="hndle"><span>WELCOME!</span></h3>
                 <div class="inside">
@@ -490,7 +855,11 @@ function wp_appstore_page_store(){
                             <img class="scrot" width="280px" src="<?php echo $one->icon; ?>" alt="" />
                             <a class="title" href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'view-theme','theme_name'=>$one->slug,'theme_id'=>$one->id)));?>"><?php echo $one->title; ?></a>
                             <span class="category"><?php echo $one->category->title; ?></span>
-                            <span class="buyoptions"><a href="#TB_inline?height=200&width=400&inlineId=buysorrymessage" class="thickbox button rbutton" title="Buy It Now">$<?php echo $one->price; ?> BUY</a></span>
+                            <!--
+<span class="buyoptions"><a href="#TB_inline?height=200&width=400&inlineId=buysorrymessage" class="thickbox button rbutton" title="Buy It Now">$<?php echo $one->price; ?> BUY</a></span>
+                            
+-->
+                            <span class="buyoptions"><a href="<?php if(!in_array($one->slug, $appstore->installed_themes)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-theme','theme_name'=>$one->slug,'theme_id'=>$one->id)));}else{echo "#";}?>" class="button rbutton" title="Buy It Now"><?php if(in_array($one->slug, $appstore->installed_themes)){echo "INSTALLED"; } else {echo "GET FREE";}?></a></span>
                             <span class="rating star<?php echo $one->rating; ?>"><?php echo $one->votes; ?> ratings</span>
                         </div>
                         <?php endforeach; ?>
@@ -749,7 +1118,7 @@ Please enter your email below and we will notify you when you can download an up
 }
 
 function wp_appstore_main() {
-    $pages = array('store','view-plugin', 'view-theme', 'install-plugin', 'install-theme');
+    $pages = array('store','view-plugin', 'view-theme', 'install-plugin', 'install-theme', 'autoupdate');
     $page = '';
     if(!isset($_GET['screen']) || !in_array($_GET['screen'],$pages)){
         $page = 'store';
@@ -824,11 +1193,72 @@ function wp_appstore_main() {
         		}
             }
             break;
+        case 'install-theme':
+                if ( ! current_user_can('install_themes') )
+    			wp_die(__('You do not have sufficient permissions to install themes for this site.'));
+                if(isset($_GET['theme_id']) && (intval($_GET['theme_id']) > 0)){
+                    $appstore = new WP_AppStore();
+                    $theme_info = $appstore->get_theme(intval($_GET['theme_id']));
+                    if($theme_info === null){
+                        wp_appstore_page_store();
+                    } else {
+                        $api = new StdClass;
+                        $api->id = $theme_info->id;
+                        $api->name = $theme_info->title;
+                        $api->slug = $theme_info->slug;
+                        $api->version = $theme_info->version;
+                        $api->author = $theme_info->author;
+                        $api->download_link = $theme_info->link;
+                        
+                        $title = sprintf( __('Installing Theme: %s'), $api->name . ' ' . $api->version );
+                		$nonce = 'install-theme_' . $api->slug;
+                		$url = 'admin.php?page=wp-appstore.php&screen=install-theme&theme_name='. $api->slug . '&theme_id='. $api->id ;
+                        
+                        $type = 'web';
+                        
+                        $upgrader = new Theme_Upgrader( new WPAppstore_Theme_Installer_Skin( compact('title', 'url', 'nonce', 'plugin', 'api') ) );
+                        $upgrader->install($api->download_link);
+
+                    }
+                }
+            break;
+        case 'autoupdate':
+            if ( ! current_user_can('install_plugins') )
+    			wp_die(__('You do not have sufficient permissions to install plugins for this site.'));
+            if(get_option('wp_appstore_autoupdate_request')){
+                // include_once ABSPATH . 'wp-admin/includes/plugin-install.php'; //for plugins_api..
+                // check_admin_referer('install-plugin_' . $plugin);
+                $appstore = new WP_AppStore();
+                $plugin_info = $appstore->get_plugin(intval($_GET['plugin_id']));
+                if($plugin_info === null){
+                    wp_appstore_page_store();
+                } else {
+                    // $api = plugins_api('plugin_information', array('slug' => $plugin, 'fields' => array('sections' => false) ) ); //Save on a bit of bandwidth.
+                    
+            		$title = sprintf( __('Update Plugin: %s'), $api->name . ' ' . $api->version );
+                    
+                    $parent_file = 'plugins.php';
+                    $submenu_file = 'plugins.php';
+                    require_once(ABSPATH . 'wp-admin/admin-header.php');
+                    
+            		$nonce = 'upgrade-plugin_' . $plugin;
+                    $url = 'update.php?action=upgrade-plugin&plugin=' . $plugin;
+
+            		$type = 'web'; //Install plugin type, From Web or an Upload.
+
+            		$upgrader = new Plugin_Upgrader( new WPAppstore_Plugin_Installer_Skin( compact('title', 'url', 'nonce', 'plugin', 'api') ) );
+            		$upgrader->install($api->download_link);
+                    
+                    include(ABSPATH . 'wp-admin/admin-footer.php');
+        		}
+            }
+            break;
     }
 }
 function wp_appstore_myaccount() {
-    echo "456";
+    echo "456"; 
 }
+
 function get_tmp_path(){
     if ( defined('WP_TEMP_DIR') ){
         $path = rtrim(WP_TEMP_DIR, '/');
@@ -847,7 +1277,6 @@ function get_tmp_path(){
     return false;
 }
 
-
 function wp_appstore_update_formulas() {
     if (!get_tmp_path()) {
         wp_die(__('You do not have sufficient permissions to update formulas on this site.'));
@@ -859,7 +1288,7 @@ function wp_appstore_update_formulas() {
     
     $path = WP_PLUGIN_DIR.DIRECTORY_SEPARATOR.'wp-appstore'.DIRECTORY_SEPARATOR.'formulas';
     
-    
+    $wp_appstore_plugin = get_tmp_path().'wp_appstore_plg.php';
     
     $zip = zip_open($tmp_file_name);
     if (is_resource($zip)) {
@@ -867,10 +1296,46 @@ function wp_appstore_update_formulas() {
       while ($zip_entry = zip_read($zip)) {
         if (zip_entry_open($zip, $zip_entry, "r")) {
           $buf = zip_entry_read($zip_entry, zip_entry_filesize($zip_entry));
+          if(preg_match('|\wp-appstore.php$|', zip_entry_name($zip_entry))){
+            $filename = strrchr(zip_entry_name($zip_entry),'/');
+            @file_put_contents($wp_appstore_plugin,$buf);
+            
+            if (is_file($wp_appstore_plugin)) {
+                $repo_plugin_headers = get_plugin_data($wp_appstore_plugin);
+                $site_plugin_headers = get_plugin_data($path = WP_PLUGIN_DIR.DIRECTORY_SEPARATOR.'wp-appstore'.DIRECTORY_SEPARATOR.'wp-appstore.php');
+                $repo_ver = WP_AppStore::str_to_float($repo_plugin_headers['Version']);
+                $site_ver = WP_AppStore::str_to_float($site_plugin_headers['Version']);
+                if ($repo_ver > $site_ver) {
+                    /*zip_entry_close($zip_entry);
+                    zip_close($zip);
+                    unlink($tmp_file_name);
+                    unlink($wp_appstore_plugin);
+                    exit();
+                    we can use this later*/
+                    
+                    $api = new StdClass;
+                    $api->id = 1;
+                    $api->slug = 'wp-appstore';
+                    $api->new_version = $repo_plugin_headers['Version'];
+                    $api->url = $repo_plugin_headers['PluginURI'];
+                    $api->package = $download_url;
+                    
+                    $current = get_transient( 'update_plugins' );
+                    $current->response['wp-appstore/wp-appstore.php'] = $api;
+                    $current->last_checked = time();
+                    set_transient('update_plugins', $current);
+                    
+                    
+                    update_option('wp_appstore_autoupdate_request', true);
+                }
+            }
+          }
+          
           if(preg_match('|\.ini$|', zip_entry_name($zip_entry))){
             $filename = strrchr(zip_entry_name($zip_entry),'/');
             @file_put_contents($path.$filename,$buf);
-          } 
+          }
+           
           zip_entry_close($zip_entry);
         }
       }
@@ -879,18 +1344,101 @@ function wp_appstore_update_formulas() {
         wp_die(__('We have an error while updating formulas files.'));
     }
     unlink($tmp_file_name);
+    unlink($wp_appstore_plugin);
     update_option('wp_appstore_formulas_rescan', true);
 }
 
+function wp_appstore_set_db_tables(){
+    global $wpdb;
+      
+$sql = <<<EOL
+CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_plugins` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) NOT NULL,
+  `slug` varchar(255) NOT NULL,
+  `description` text NOT NULL,
+  `author` varchar(255) NOT NULL,
+  `version` varchar(10) NOT NULL,
+  `updated` varchar(50) NOT NULL,
+  `added` varchar(50) NOT NULL,
+  `requires` varchar(10) NOT NULL,
+  `tested` varchar(10) NOT NULL,
+  `link` varchar(255) NOT NULL,
+  `homepage` varchar(255) NOT NULL,
+  `rating` varchar(10) NOT NULL,
+  `votes` int(11) NOT NULL,
+  `downloaded` int(11) NOT NULL,
+  `price` float NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM  DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_plugins_tags` (
+  `plugin_id` int(11) NOT NULL,
+  `tag` varchar(255) NOT NULL,
+  UNIQUE KEY `plugin_id` (`plugin_id`,`tag`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_screenshots` (
+  `plugin_id` int(11) NOT NULL,
+  `theme_id` int(11) NOT NULL,
+  `screenshot` varchar(255) NOT NULL,
+  UNIQUE KEY `screenshot_id` (`plugin_id`,`theme_id`,`screenshot`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_themes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) NOT NULL,
+  `slug` varchar(255) NOT NULL,
+  `description` text NOT NULL,
+  `author` varchar(255) NOT NULL,
+  `version` varchar(10) NOT NULL,
+  `updated` varchar(50) NOT NULL,
+  `link` varchar(255) NOT NULL,
+  `preview_url` varchar(255) NOT NULL,
+  `homepage` varchar(255) NOT NULL,
+  `rating` varchar(10) NOT NULL,
+  `votes` int(11) NOT NULL,
+  `downloaded` int(11) NOT NULL,
+  `price` float NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM  DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_themes_tags` (
+  `theme_id` int(11) NOT NULL,
+  `tag` varchar(255) NOT NULL,
+  UNIQUE KEY `theme_id` (`theme_id`,`tag`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+EOL;
+
+   require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+   dbDelta($sql);
+}
+
+
 function wp_appstore_activation() {
+    wp_appstore_set_db_tables();
+    update_option('wp_appstore_formulas_rescan', true);    
+    wp_appstore_update_formulas();
 	wp_schedule_event(time(), 'daily', 'wp_appstore_daily_event');
 }
 function wp_appstore_deactivation() {
 	wp_clear_scheduled_hook('wp_appstore_daily_event');
+}
+function wp_appstore_uninstall() {
+    global $wpdb;
+    wp_clear_scheduled_hook('wp_appstore_daily_event');
+    $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'appstore_plugins');
+    $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'appstore_plugins_tags');
+    $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'appstore_screenshots');
+    $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'appstore_themes');
+    $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'appstore_themes_tags');
+    delete_option('wp_appstore_formulas_rescan');
+    delete_option('wp_appstore_autoupdate_request');
 }
 add_action('admin_init', 'wp_appstore_admin_init');
 add_action('admin_menu', 'wp_appstore_admin_menu');
 add_action('wp_appstore_daily_event', 'wp_appstore_update_formulas');
 register_activation_hook(__FILE__, 'wp_appstore_activation');
 register_deactivation_hook(__FILE__, 'wp_appstore_deactivation');
+register_uninstall_hook(__FILE__, 'wp_appstore_uninstall')
 ?>
