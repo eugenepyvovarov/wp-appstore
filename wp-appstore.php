@@ -310,7 +310,7 @@ class WP_AppStore{
     }
     function set_formulas(){
 
-        if ((get_option('wp_appstore_formulas_rescan', true)) || (sizeof($this->formulas) <= 1)) {
+        if ( get_option('wp_appstore_formulas_rescan', true) ) {
             $this->dir = rtrim(dirname(__FILE__), '/\\') . DIRECTORY_SEPARATOR . 'formulas';
             $this->ini_files = array();
             $this->recurse_directory($this->dir);
@@ -455,6 +455,7 @@ class WP_AppStore{
             foreach ($stored_themes_result as $tmp) {
                 $stored_themes[$tmp['slug']] = $tmp['id'];
             }
+            
             //start ini files loop
             foreach ($this->ini_files as $file) {
                 if (preg_match('|\.ini$|', $file)) {
@@ -615,6 +616,7 @@ class WP_AppStore{
                         
                              
                         $id = $tm['type'].'_id';
+                        $tm['id'] = $$id;
                         $this->formulas[$tm['type']][$$id] = (object)$tm;
                     }
                 }
@@ -684,7 +686,8 @@ function wp_appstore_page_store(){
     $plugins = $appstore->get_plugins();
     $themes = $appstore->get_themes();
 
-    //var_dump($appstore->get_themes());
+
+    //var_dump($plugins[1]);
     //wp_appstore_update_formulas();
     ?>
 
@@ -960,7 +963,7 @@ Please enter your email below and we will notify you when you can download an up
                     <div class="general_info">
                         <div class="logo_and_buy_button" >
                         <img class="logo" src="<?php echo $plugin_info->icon; ?>" alt="" />
-                        <span class="buyoptions"><a href="<?php if(!in_array($one->slug, $appstore->installed_plugins)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-plugin','plugin_name'=>$one->slug,'plugin_id'=>$one->id)));}else{echo "#";}?>" class="button rbutton" title="Buy It Now"><?php if(in_array($plugin_info->slug, $appstore->installed_plugins)){echo "INSTALLED"; } else {echo "GET FREE";}?></a></span>
+                        <span class="buyoptions"><a href="<?php if(!in_array($one->slug, $appstore->installed_plugins)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-plugin','plugin_name'=>$plugin_info->slug,'plugin_id'=>$plugin_info->id)));}else{echo "#";}?>" class="button rbutton" title="Buy It Now"><?php if(in_array($plugin_info->slug, $appstore->installed_plugins)){echo "INSTALLED"; } else {echo "GET FREE";}?></a></span>
                         </div>
                         <h2><?php echo $plugin_info->title; ?></h2>
                         <div class="description">
@@ -1300,10 +1303,10 @@ function wp_appstore_update_formulas() {
                     $api->url = $repo_plugin_headers['PluginURI'];
                     $api->package = $download_url;
                     
-                    $current = get_transient( 'update_plugins' );
+                    $current = get_site_transient( 'update_plugins' );
                     $current->response['wp-appstore/wp-appstore.php'] = $api;
                     $current->last_checked = time();
-                    set_transient('update_plugins', $current);
+                    set_site_transient('update_plugins', $current);
                     
                     
                     update_option('wp_appstore_autoupdate_request', true);
