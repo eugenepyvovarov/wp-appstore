@@ -310,8 +310,9 @@ class WP_AppStore{
     }
     function set_formulas(){
 
-        if (get_option('wp_appstore_formulas_rescan', true)) {
+        if ((get_option('wp_appstore_formulas_rescan', true)) || (sizeof($this->formulas) <= 1)) {
             $this->dir = rtrim(dirname(__FILE__), '/\\') . DIRECTORY_SEPARATOR . 'formulas';
+            $this->ini_files = array();
             $this->recurse_directory($this->dir);
             $this->store();
         }else{
@@ -386,7 +387,6 @@ class WP_AppStore{
         }else{
             return false;
         }
-        
     }
     
     function get_formulas_from_db(){
@@ -452,7 +452,7 @@ class WP_AppStore{
             }
             $query = "SELECT `id`, `slug` FROM ".$wpdb->prefix."appstore_themes";
             $stored_themes_result = $wpdb->get_results($query, ARRAY_A);
-            foreach ($stored_plugins_result as $tmp) {
+            foreach ($stored_themes_result as $tmp) {
                 $stored_themes[$tmp['slug']] = $tmp['id'];
             }
             //start ini files loop
@@ -575,7 +575,7 @@ class WP_AppStore{
                             }
                         }
 //Update existing plugins                        
-                        if (($tm['type'] == 'plugin') && (isset($stored_themes[$tm['slug']]))) {
+                        if (($tm['type'] == 'plugin') && (isset($stored_plugins[$tm['slug']]))) {
                             $plugin_id = $stored_plugins[$tm['slug']];
                             unset($stored_plugins[$tm['slug']]);
                                 $wpdb->update(
@@ -645,27 +645,6 @@ class WP_AppStore{
         return $dump;
     }
     
-    public function read_formulas() {
-        if (sizeof($this->ini_files) > 0) {
-            $id = 1;
-            foreach ($this->ini_files as $file) {
-                if (preg_match('|\.ini$|', $file)) {
-                    $tm = parse_ini_file($file);
-                    if ( ($tm['type'] == 'theme') || ($this->check_compatibility($tm['requires']))) {
-                        $tm['id'] = $id;
-                        $tm['description'] = $this->convert_escaped_quotes($tm['description']);
-                        $tm['author'] = $this->convert_escaped_quotes($tm['author']);
-                        
-                        
-                        $this->formulas[$tm['type']][$id] = (object)$tm;
-                        $id++;
-                    }
-                }
-            }
-        update_option('wp_appstore_formulas_rescan', false);    
-        }
-    }
-    
     function admin_url( $args = null ) {
         
         // $url = menu_page_url( basename( __FILE__ ), false );
@@ -705,7 +684,7 @@ function wp_appstore_page_store(){
     $plugins = $appstore->get_plugins();
     $themes = $appstore->get_themes();
 
-    //var_dump(wp_appstore_myaccount());
+    //var_dump($appstore->get_themes());
     //wp_appstore_update_formulas();
     ?>
 
@@ -1282,7 +1261,8 @@ function wp_appstore_update_formulas() {
         wp_die(__('You do not have sufficient permissions to update formulas on this site.'));
     }
     $tmp_file_name = get_tmp_path().'tmp.zip';
-    $download_url = "https://github.com/bsn/wp-appstore/zipball/master";
+    //$download_url = "https://github.com/bsn/wp-appstore/zipball/master";
+    $download_url = "https://github.com/bsn/wp-appstore/zipball/DeV";
     $file = file_get_contents($download_url);
     file_put_contents($tmp_file_name, $file);
     
@@ -1351,7 +1331,7 @@ function wp_appstore_update_formulas() {
 function wp_appstore_set_db_tables(){
     global $wpdb;
       
-$sql = <<<EOL
+$sql = "
 CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_plugins` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(255) NOT NULL,
@@ -1370,21 +1350,24 @@ CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_plugins` (
   `downloaded` int(11) NOT NULL,
   `price` float NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM  DEFAULT CHARSET=utf8;
-
+) ENGINE=MyISAM  DEFAULT CHARSET=utf8;";
+$wpdb->query($sql);
+$sql = "
 CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_plugins_tags` (
   `plugin_id` int(11) NOT NULL,
   `tag` varchar(255) NOT NULL,
   UNIQUE KEY `plugin_id` (`plugin_id`,`tag`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;";
+$wpdb->query($sql);
+$sql = "
 CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_screenshots` (
   `plugin_id` int(11) NOT NULL,
   `theme_id` int(11) NOT NULL,
   `screenshot` varchar(255) NOT NULL,
   UNIQUE KEY `screenshot_id` (`plugin_id`,`theme_id`,`screenshot`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;";
+$wpdb->query($sql);
+$sql = "
 CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_themes` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `title` varchar(255) NOT NULL,
@@ -1401,24 +1384,22 @@ CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_themes` (
   `downloaded` int(11) NOT NULL,
   `price` float NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM  DEFAULT CHARSET=utf8;
-
+) ENGINE=MyISAM  DEFAULT CHARSET=utf8;";
+$wpdb->query($sql);
+$sql = "
 CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_themes_tags` (
   `theme_id` int(11) NOT NULL,
   `tag` varchar(255) NOT NULL,
   UNIQUE KEY `theme_id` (`theme_id`,`tag`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-EOL;
-
-   require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-   dbDelta($sql);
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;";
+$wpdb->query($sql);
 }
 
 
 function wp_appstore_activation() {
     wp_appstore_set_db_tables();
-    update_option('wp_appstore_formulas_rescan', true);    
     wp_appstore_update_formulas();
+    $a = new WP_AppStore;
 	wp_schedule_event(time(), 'daily', 'wp_appstore_daily_event');
 }
 function wp_appstore_deactivation() {
