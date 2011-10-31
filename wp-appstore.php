@@ -310,7 +310,7 @@ class WP_AppStore{
     }
     function set_formulas(){
 
-        if ( get_option('wp_appstore_formulas_rescan', true) ) {
+        if ( get_option('wp_appstore_formulas_rescan') ) {
             $this->dir = rtrim(dirname(__FILE__), '/\\') . DIRECTORY_SEPARATOR . 'formulas';
             $this->ini_files = array();
             $this->recurse_directory($this->dir);
@@ -659,6 +659,8 @@ class WP_AppStore{
                              
                         $id = $tm['type'].'_id';
                         $tm['id'] = $$id;
+                        $tm['screenshots'] = $screenshots;
+                        $tm['tags'] = $tags;
                         $this->formulas[$tm['type']][$$id] = (object)$tm;
                     }
                 }
@@ -709,6 +711,41 @@ class WP_AppStore{
     public function get_theme($id){
         return $this->formulas['theme'][$id];
     }
+    function mass_in_array($needle, $haystack){
+        if (!is_array($needle))
+            return false;
+        foreach ($needle as $key) {
+            if (isset($haystack[$key]))
+                $return[$key] = $haystack[$key];
+        }
+        return $return;
+    }
+    public function get_items_by_tag($tag, $item_type = ''){
+        global $wpdb;
+        if (strlen($tag)<=1) {
+            return false;
+        }
+        
+        $query = $wpdb->prepare("SELECT `theme_id` FROM ".$wpdb->prefix."appstore_themes_tags WHERE tag LIKE %s", $tag.'%');
+        $themes_ids = $wpdb->get_col($query);
+        
+        $query = $wpdb->prepare("SELECT `plugin_id` FROM ".$wpdb->prefix."appstore_plugins_tags WHERE tag LIKE %s", $tag.'%');
+        $plugins_ids = $wpdb->get_col($query);
+        
+        switch ($item_type) {
+           case 'plugin' :
+                            $return['plugin'] = $this->mass_in_array($plugins_ids, $this->formulas['plugin']);
+           break;
+           case 'theme' :
+                            $return['theme'] = $this->mass_in_array($themes_ids, $this->formulas['theme']);
+           break;
+           default :
+                            $return['plugin'] = $this->mass_in_array($plugins_ids, $this->formulas['plugin']);
+                            $return['theme'] = $this->mass_in_array($themes_ids, $this->formulas['theme']);
+           break;
+        }
+        return $return;
+    }
 }
 function wp_appstore_admin_init() {
     wp_enqueue_style( 'wp-appstore-css', plugins_url( basename( dirname( __FILE__ ) ) . '/wp-appstore.css' ), false, '20110322' );
@@ -728,7 +765,9 @@ function wp_appstore_page_store(){
     $plugins = $appstore->get_plugins();
     $themes = $appstore->get_themes();
     $updates = get_option('wp_appstore_for_update', array());
-    //var_dump(wp_appstore_myaccount());
+    
+    
+    //var_dump($appstore->get_items_by_tag('dark'));
     //var_dump(get_site_transient( 'update_plugins' ));
     //wp_appstore_update_formulas();
     ?>
@@ -981,8 +1020,23 @@ Please enter your email below and we will notify you when you can download an up
                             <ul style="margin-left:10px;font-weight:bold;">
                                 <li>Released: <?php echo date('d M, Y', strtotime($plugin_info->updated));?></li>
                                 <li>Version: <?php echo $plugin_info->version; ?></li>
-                                <li>Category: <a href="#"><?php echo $plugin_info->category_title; ?></a></li>
-                                <li>Rating: <span class="star<?php echo $plugin_info->rating; ?>" style="padding-left:95px;color:#999;"><?php echo $plugin_info->votes; ?> ratings</span></li>
+                                <?php if(sizeof($plugin_info->tags) > 0): ?>
+                                <li>Tags:
+                                <?php foreach($plugin_info->tags as $tag): ?>
+                                <a href="#" style="text-transform: capitalize; margin-right: 5px;"><?php echo $tag; ?></a>
+                                <?php endforeach; ?>
+                                </li>
+                                <?php endif; ?>
+                                <li>Rating:
+                                <div title="<?php printf( _n( '(based on %s rating)', '(based on %s ratings)', $plugin_info->votes ), number_format_i18n( $plugin_info->votes ) ) ?>" class="star-holder">
+            					<div style="width: <?php echo esc_attr( $plugin_info->rating ) ?>px" class="star star-rating"></div>
+            					<div class="star star5"><img alt="5 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
+            					<div class="star star4"><img alt="4 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
+            					<div class="star star3"><img alt="3 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
+            					<div class="star star2"><img alt="2 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
+            					<div class="star star1"><img alt="1 star" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
+            				    </div>
+                                </li>
                                 <li></li>
                             </ul>
                         </p>
@@ -1028,7 +1082,7 @@ Please enter your email below and we will notify you when you can download an up
                         </div>
                         <script type="text/javascript">
                         jQuery(window).load(function() {
-                            jQuery('#slider').nivoSlider({effect:'sliceDownRight',animSpeed:500, pauseTime:7500});
+                            jQuery('#nivo-slider').nivoSlider({effect:'sliceDownRight',animSpeed:500, pauseTime:7500});
                         });
                         </script>
                     </div>
