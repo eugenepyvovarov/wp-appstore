@@ -369,25 +369,25 @@ class WP_AppStore{
             wp_update_plugins();
             $current = get_site_transient( 'update_plugins' );
         }
+        
         foreach ($plugins as $key => $value) {
-            $query = "SELECT `version`, `slug`, `id`, `link` FROM ".$wpdb->prefix."appstore_plugins WHERE title LIKE \"".$value['Name']."\"";
+            $query = $wpdb->prepare("SELECT `version`, `slug`, `id`, `link`, `homepage`, `title` FROM ".$wpdb->prefix."appstore_plugins WHERE title LIKE %s", '%'.$value['Name'].'%');
             $stored_plugins_result = $wpdb->get_results($query);
-            
             if ($stored_plugins_result) {
                 $repo_ver = $this->str_to_float($stored_plugins_result[0]->version);
                 $curr_ver = $this->str_to_float($value['Version']);
                 if ($repo_ver > $curr_ver) {
-                    if (!isset($current->response[$key])) {
                         $api = new StdClass;
                         $api->id = $stored_plugins_result[0]->id;
                         $api->slug = $stored_plugins_result[0]->slug;
                         $api->new_version = $stored_plugins_result[0]->version;
-                        $api->url = $stored_plugins_result[0]->link;
+                        $api->url = $stored_plugins_result[0]->homepage;
                         $api->package = $stored_plugins_result[0]->link;
+                    if (!isset($current->response[$key])) {
                         $current->response[$key] = $api;
                         $updated = 1;
                     }
-                $for_update[$stored_plugins_result[0]->slug] = array('file' => $key, 'object' => $api);
+                $for_update[$stored_plugins_result[0]->slug] = array('file' => $key, 'object' => $api, 'title' => $stored_plugins_result[0]->title);
                 }
             }
         }
@@ -429,6 +429,19 @@ class WP_AppStore{
         }else{
             return false;
         }
+    }
+    
+    public function get_stats(){
+        global $wpdb;
+        $last_update = get_option('wp_appstore_last_lib_update');
+        $stats['last_update'] = $last_update ? 'Last update: '.date('m / d / Y - G:i:s') : 'No updates since installation!';
+        $sql = "SELECT COUNT(*) as count FROM ".$wpdb->prefix."appstore_plugins";
+        $stats['plugins'] = $wpdb->get_results($sql, ARRAY_N);
+        $stats['plugins'] = $stats['plugins'][0][0];
+        $sql = "SELECT COUNT(*) as count FROM ".$wpdb->prefix."appstore_themes";
+        $stats['themes'] = $wpdb->get_results($sql, ARRAY_N);
+        $stats['themes'] = $stats['themes'][0][0];
+        return $stats;
     }
     
     function get_formulas_from_db(){
@@ -720,6 +733,32 @@ class WP_AppStore{
         }
         return $return;
     }
+    public function search($keyword, $item_type = ''){
+        global $wpdb;
+        if (strlen($keyword)<=1) {
+            return false;
+        }
+        
+        $query = $wpdb->prepare("SELECT `id` FROM ".$wpdb->prefix."appstore_themes WHERE title LIKE %s", '%'.$keyword.'%');
+        $themes_ids = $wpdb->get_col($query);
+        
+        $query = $wpdb->prepare("SELECT `id` FROM ".$wpdb->prefix."appstore_plugins WHERE title LIKE %s", '%'.$keyword.'%');
+        $plugins_ids = $wpdb->get_col($query);
+        
+        switch ($item_type) {
+           case 'plugin' :
+                            $return['plugin'] = $this->mass_in_array($plugins_ids, $this->formulas['plugin']);
+           break;
+           case 'theme' :
+                            $return['theme'] = $this->mass_in_array($themes_ids, $this->formulas['theme']);
+           break;
+           default :
+                            $return['plugin'] = $this->mass_in_array($plugins_ids, $this->formulas['plugin']);
+                            $return['theme'] = $this->mass_in_array($themes_ids, $this->formulas['theme']);
+           break;
+        }
+        return $return;
+    }
     public function get_items_by_tag($tag, $item_type = ''){
         global $wpdb;
         if (strlen($tag)<=1) {
@@ -746,6 +785,24 @@ class WP_AppStore{
         }
         return $return;
     }
+    public function get_tags($type){
+        if (($type != 'plugin') && ($type != 'theme')) {
+            return false;
+        }
+        global $wpdb;
+        switch ($type) {
+           case 'plugin' :
+                            $table = $wpdb->prefix."appstore_plugins_tags";
+           break;
+           case 'theme':
+                            $table = $wpdb->prefix."appstore_themes_tags";
+           break;
+        }
+        $query = $wpdb->prepare("SELECT DISTINCT `tag` FROM $table");
+        $tags = $wpdb->get_col($query);
+        natsort($tags);
+        return $tags;
+    }
 }
 function wp_appstore_admin_init() {
     wp_enqueue_style( 'wp-appstore-css', plugins_url( basename( dirname( __FILE__ ) ) . '/wp-appstore.css' ), false, '20110322' );
@@ -756,19 +813,20 @@ function wp_appstore_admin_init() {
     wp_enqueue_script('thickbox');
 }
 function wp_appstore_admin_menu() {
-    add_menu_page( 'WP Appstore', 'WP AppStore', 'activate_plugins', basename( __FILE__ ), 'wp_appstore_main', null, 61 );
-    add_submenu_page( basename( __FILE__ ), 'Store', 'Store', 'activate_plugins', basename( __FILE__ ), 'wp_appstore_main' );
-    // add_submenu_page( basename( __FILE__ ), 'My account', 'My account', 'activate_plugins', 'wp_appstore_myaccount', 'wp_appstore_myaccount' );
+    add_menu_page( 'WP Appstore', 'WP AppStore', 'manage_options', basename( __FILE__ ), 'wp_appstore_main', null, 61 );
+    add_submenu_page( basename( __FILE__ ), 'All Plugins', 'All Plugins', 'manage_options', basename( __FILE__ ).'&screen=all-plugins', 'wp_appstore_main' );
+    add_submenu_page( basename( __FILE__ ), 'All Themes', 'All Themes', 'manage_options', basename( __FILE__ ).'&screen=all-themes', 'wp_appstore_main' );
+    //add_submenu_page( basename( __FILE__ ), 'Recently Updated', 'Recently Updated', 'manage_options', basename( __FILE__ ).'&screen=updates', 'wp_appstore_main' );
 }
 function wp_appstore_page_store(){
     $appstore = new WP_AppStore();
     $plugins = $appstore->get_plugins();
     $themes = $appstore->get_themes();
+    //$appstore->check_for_plugins_updates();
     $updates = get_option('wp_appstore_for_update', array());
-    
-    
-    //var_dump($appstore->get_items_by_tag('dark'));
-    //var_dump(get_site_transient( 'update_plugins' ));
+    $stats = $appstore->get_stats();
+
+    //var_dump($updates);
     //wp_appstore_update_formulas();
     ?>
 
@@ -800,13 +858,55 @@ function wp_appstore_page_store(){
                     <p>Welcome to the first place where you can get professional plugins and the best themes.</p>
                     <p>This store is just a preview of what's to come.  Please send feedback to <a href="mailto:eugene@lifeisgoodlabs.com">eugene@lifeisgoodlabs.com</a></p>
                 </div>
-            </div>            
+            </div> 
+            <div id="" class="postbox " style="">
+                <h3 class="hndle"><span>Search!</span></h3>
+                <div class="inside">
+                <form method="get" enctype="text/plain" action="">
+                <input type="hidden" value="wp-appstore.php" name="page" />
+                <input type="hidden" value="search" name="screen" />
+                    <p class="searchbox">
+	                   <label for="plugin-search-input" class="screen-reader-text">Search Formulas Library:</label>
+	                   <input type="text" value="" name="s" id="plugin-search-input" style="margin-right: 1.5em;padding: .2em .3em;width: 95%;float: left;z-index: 999;"/>
+	                   <ul class="search-options">
+                            <li><input type="checkbox" value="1" name="plugin" title="Search Plugins" />Search Plugins</li>
+                            <li><input type="checkbox" value="1" name="theme" title="Search Themes" />Search Themes</li>
+                       </ul>
+                       <input type="submit" value="Search" class="button" id="search-submit" name="" />
+                    </p>
+                </form>
+                </div>
+            </div>  
+            <div id="" class="postbox " style="">
+                <h3 class="hndle"><span>WP Appstore stats</span></h3>
+                <div class="inside">
+                    <p><?php echo $stats['last_update']; ?></a></p>
+                    <p>Plugins formulas in database: <?php echo $stats['plugins']; ?></p>
+                    <p>Themes formulas in database: <?php echo $stats['themes']; ?></p>
+                </div>
+            </div>
+            <?php if(sizeof($updates) > 0): ?>
+            <div id="" class="postbox " style="">
+                <h3 class="hndle"><span>NEW VERSIONS OF PLUGINS AVALIABLE!</span></h3>
+                <div class="inside">
+                    <p>We just received info about updates of next plugins:</p>
+                    <ul>
+                    <?php foreach($updates as $update): ?>
+                        <li><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'view-plugin','plugin_name'=>$update['object']->slug,'plugin_id'=>$update['object']->id)));?>" title="View Plugin Page"><?php echo $update['title'].' : Updated to version '.$update['object']->new_version; ?></a></li>
+                    <?php endforeach; ?>
+                    </ul>
+                    </p>
+                </div>
+            </div>  
+            <?php endif; ?>             
+<!--
             <div id="" class="postbox " style="">
                 <h3 class="hndle"><span>Special Offer!</span></h3>
                 <div class="inside" style="text-align:center;">
                     <a href="http://themefuse.com" target="_blank"><img src="<?php echo plugins_url( 'images/themefuse.png', __FILE__ ); ?>" alt="ThemeFuse offer" /></a>
                 </div>
-            </div>            
+            </div> 
+-->           
             <!-- <div id="" class="postbox " style="">
                 <h3 class="hndle"><span>WP APPSTORE QUICK LINKS</span></h3>
                 <div class="inside">
@@ -979,7 +1079,237 @@ Please enter your email below and we will notify you when you can download an up
     </div>
     <?php
 }
+function wp_appstore_page_search_results($results){
+    $plugins = $results['plugin'];
+    $themes = $results['theme'];
+    $updates = get_option('wp_appstore_for_update', array());
+    $appstore = $results['appstore_object'];
+    $stats = $appstore->get_stats();
+    $tags = $results['tags'];
+    ?>
 
+    <div class="wrap">
+        <?php screen_icon( 'plugins' );?>
+        <h2>WP AppStore
+			<span style="position:absolute;padding-left:15px;">
+            <a href="http://www.facebook.com/pages/WP-AppStore/147376395324061" target="_blank"><img src="<?php echo plugins_url( 'images/facebook.png', __FILE__ ); ?>" alt="" /></a>
+            <a href="http://twitter.com/wpappstore" target="_blank"><img src="<?php echo plugins_url( 'images/twitter.png', __FILE__ ); ?>" alt="" /></a>
+            <a href="http://wp-appstore.com/" target="_blank"><img src="<?php echo plugins_url( 'images/rss.png', __FILE__ ); ?>" alt="" /></a>
+            </span>
+		</h2>
+        <div id="poststuff" class="metabox-holder has-right-sidebar" style="max-width:950px;min-width:640px;">
+        <div id="side-info-column" class="inner-sidebar draggable">
+            <?php if(get_option('wp_appstore_autoupdate_request')): ?>
+            <div id="" class="postbox " style="">
+                <h3 class="hndle"><span>Update Avaliable!</span></h3>
+                <div class="inside">
+                    <p>New update for this plugin now avaliable!</p>
+                    <p style="text-align: center;">
+                    <span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'autoupdate')));?>" class="button rbutton" title="Update It Now">Get Update Now!</a></span>
+                    </p>
+                </div>
+            </div>  
+            <?php endif; ?>
+            <div id="" class="postbox " style="">
+                <h3 class="hndle"><span>WELCOME!</span></h3>
+                <div class="inside">
+                    <p>Welcome to the first place where you can get professional plugins and the best themes.</p>
+                    <p>This store is just a preview of what's to come.  Please send feedback to <a href="mailto:eugene@lifeisgoodlabs.com">eugene@lifeisgoodlabs.com</a></p>
+                </div>
+            </div> 
+            <div id="" class="postbox " style="">
+                <h3 class="hndle"><span>Search!</span></h3>
+                <div class="inside">
+                <form method="get" enctype="text/plain" action="">
+                <input type="hidden" value="wp-appstore.php" name="page" />
+                <input type="hidden" value="search" name="screen" />
+                    <p class="searchbox">
+	                   <label for="plugin-search-input" class="screen-reader-text">Search Formulas Library:</label>
+                       <input type="text" value="<?php echo $results['keyword']; ?>" name="s" id="plugin-search-input" style="margin-right: 1.5em;padding: .2em .3em;width: 95%;float: left;z-index: 999;"/>
+	                   <ul class="search-options">
+                            <li><input type="checkbox" value="1" name="plugin" title="Search Plugins" />Search Plugins</li>
+                            <li><input type="checkbox" value="1" name="theme" title="Search Themes" />Search Themes</li>
+                       </ul>
+                       <input type="submit" value="Search" class="button" id="search-submit" name="" />
+                    </p>
+                </form>
+                </div>
+            </div>
+            <?php if($tags): ?>
+            <div id="" class="postbox " style="">
+                <h3 class="hndle"><span>Tags:</span></h3>
+                <div class="inside">
+                    <p>
+                    <?php foreach($tags as $tag): ?>
+                        <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'tag-filter','tag'=>$tag,'plugin'=>'1'))); ?>" style="text-transform: capitalize; margin-right: 5px;"><?php echo $tag; ?></a>
+                    <?php endforeach; ?>
+                    </p>
+                </div>
+            </div>
+            <?php endif; ?>  
+            <div id="" class="postbox " style="">
+                <h3 class="hndle"><span>WP Appstore stats</span></h3>
+                <div class="inside">
+                    <p><?php echo $stats['last_update']; ?></a></p>
+                    <p>Plugins formulas in database: <?php echo $stats['plugins']; ?></p>
+                    <p>Themes formulas in database: <?php echo $stats['themes']; ?></p>
+                </div>
+            </div>
+            <?php if(sizeof($updates) > 0): ?>
+            <div id="" class="postbox " style="">
+                <h3 class="hndle"><span>NEW VERSIONS OF PLUGINS AVALIABLE!</span></h3>
+                <div class="inside">
+                    <p>We just received info about updates of next plugins:</p>
+                    <ul>
+                    <?php foreach($updates as $update): ?>
+                        <li><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'view-plugin','plugin_name'=>$update['object']->slug,'plugin_id'=>$update['object']->id)));?>" title="View Plugin Page"><?php echo $update['title'].' : Updated to version '.$update['object']->new_version; ?></a></li>
+                    <?php endforeach; ?>
+                    </ul>
+                    </p>
+                </div>
+            </div>  
+            <?php endif; ?>             
+            <script src="http://widgets.twimg.com/j/2/widget.js"></script>
+            <script>
+            new TWTR.Widget({
+              version: 2,
+              type: 'profile',
+              rpp: 5,
+              interval: 6000,
+              width: 280,
+              height: 300,
+              theme: {
+                shell: {
+                  background: '#e6e6e6',
+                  color: '#303030'
+                },
+                tweets: {
+                  background: '#ffffff',
+                  color: '#5c5c5c',
+                  links: '#56748f'
+                }
+              },
+              features: {
+                scrollbar: false,
+                loop: false,
+                live: true,
+                hashtags: true,
+                timestamp: false,
+                avatars: false,
+                behavior: 'all'
+              }
+            }).render().setUser('wpappstore').start();
+            </script>
+            <div id="" class="postbox " style="margin-top:20px;">
+                <h3 class="hndle"><span>SUBSCRIBE FOR UPDATES</span></h3>
+                <div class="inside">
+                    <!-- Begin MailChimp Signup Form -->
+                    <!--[if IE]>
+                    <style type="text/css" media="screen">
+                    	#mc_embed_signup fieldset {position: relative;}
+                    	#mc_embed_signup legend {position: absolute; top: -1em; left: .2em;}
+                    </style>
+                    <![endif]--> 
+                    <!--[if IE 7]>
+                    <style type="text/css" media="screen">
+                    	.mc-field-group {overflow:visible;}
+                    </style>
+                    <![endif]-->
+
+                    <div id="mc_embed_signup">
+                    <form action="http://lifeisgoodlabs.us1.list-manage2.com/subscribe/post?u=382bf9a62c1627d0e7dd2cb42&amp;id=da67cb7263" method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate" target="_blank" style="font: normal 100% Arial, sans-serif;font-size: 10px;">
+                    	<fieldset style="padding-top: 1.5em;background-color: #fff;color: #000;text-align: left;">
+
+
+                    <div class="mc-field-group" style="margin: .3em 5%;clear: both;overflow: hidden;">
+                    <label for="mce-EMAIL" style="display: block;line-height: 1.5em;font-weight: bold;">Email Address <strong class="note-required">*</strong>
+                    </label>
+                    <input type="text" value="" name="EMAIL" class="required email" id="mce-EMAIL" style="margin-right: 1.5em;padding: .2em .3em;width: 95%;float: left;z-index: 999;">
+                    </div>
+                    		<div id="mce-responses" style="float: left;top: -1.4em;padding: 0em .5em 0em .5em;overflow: hidden;width: 90%;margin: 0 5%;clear: both;">
+                    			<div class="response" id="mce-error-response" style="display: none;margin: 1em 0;padding: 1em .5em .5em 0;font-weight: bold;float: left;top: -1.5em;z-index: 1;width: 80%;background: FBE3E4;color: #D12F19;"></div>
+                    			<div class="response" id="mce-success-response" style="display: none;margin: 1em 0;padding: 1em .5em .5em 0;font-weight: bold;float: left;top: -1.5em;z-index: 1;width: 80%;background: #E3FBE4;color: #529214;"></div>
+                    		</div>
+                    		<div>
+                    		<input type="submit" value="Subscribe" name="subscribe" id="mc-embedded-subscribe" class="button" style="clear: both;width: auto;display: block;margin: 1em 0 1em 5%;"></div>
+                    	</fieldset>	
+                    	<a href="#" id="mc_embed_close" class="mc_embed_close" style="display: none;">Close</a>
+                    </form>
+                    </div>
+
+                    <!--End mc_embed_signup-->
+                </div>
+            </div>
+        </div>
+
+        <div id="post-body">
+            <div id="post-body-content">
+            <?php if($results['serched_for']): ?>
+            <h2><?php echo $results['serched_for']; ?></h2>
+            <?php endif; ?>
+                <?php if(sizeof($plugins) > 0): ?>
+                <div id="namediv" class="stuffbox">
+                    <h3><label for="link_name">Plugins</label></h3>
+                    <div class="inside">
+                        <?php foreach($plugins as $one): ?>
+                        <div class="plugin">
+                            <img class="logo" src="<?php echo $one->icon; ?>" alt="" />
+                            <a class="title" href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'view-plugin','plugin_name'=>$one->slug,'plugin_id'=>$one->id)));?>"><?php echo $one->title;?></a>
+                            <span class="category"><?php echo $one->category->title; ?></span>
+                            <span class="rating star<?php echo $one->rating;?>"><?php echo $one->votes;?> ratings</span>
+                            <span class="buyoptions"><a href="<?php if(array_key_exists($one->slug, $updates)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'plugin-update','plugin_name'=>$one->slug)));} elseif(!in_array($one->slug, $appstore->installed_plugins)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-plugin','plugin_name'=>$one->slug,'plugin_id'=>$one->id)));}else{echo "#";}?>" class="button rbutton" title="Buy It Now"><?php if(array_key_exists($one->slug, $updates)){echo "UPDATE";} elseif(in_array($one->slug, $appstore->installed_plugins)){echo "INSTALLED"; } else {echo "GET FREE";}?></a></span>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+                <?php if(sizeof($themes) > 0): ?>
+                <div id="addressdiv" class="stuffbox">
+                    <h3><label for="link_url">Themes</label></h3>
+                    <div class="inside">
+                        <?php foreach($themes as $one): ?>
+                        <div class="theme">
+                            <img class="scrot" width="280px" src="<?php echo $one->icon; ?>" alt="" />
+                            <a class="title" href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'view-theme','theme_name'=>$one->slug,'theme_id'=>$one->id)));?>"><?php echo $one->title; ?></a>
+                            <span class="category"><?php echo $one->category->title; ?></span>
+                            <span class="buyoptions"><a href="<?php if(!in_array($one->slug, $appstore->installed_themes)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-theme','theme_name'=>$one->slug,'theme_id'=>$one->id)));}else{echo "#";}?>" class="button rbutton" title="Buy It Now"><?php if(in_array($one->slug, $appstore->installed_themes)){echo "INSTALLED"; } else {echo "GET FREE";}?></a></span>
+                            <span class="rating star<?php echo $one->rating; ?>"><?php echo $one->votes; ?> ratings</span>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        </div>
+        
+    </div>
+    <div id="buysorrymessage" style="display:none;">
+        <p style="margin-top:50px;margin-left:20px;margin-right:30px;">Sorry, but this functionality is not yet available. 
+Please enter your email below and we will notify you when you can download an update.</p>
+        <p>
+        <form action="http://lifeisgoodlabs.us1.list-manage2.com/subscribe/post?u=382bf9a62c1627d0e7dd2cb42&amp;id=da67cb7263" method="post" id="mc-embedded-subscribe-form" name="mc-embedded-subscribe-form" class="validate" target="_blank" style="font: normal 100% Arial, sans-serif;font-size: 10px;">
+        	<fieldset style="background-color: #fff;color: #000;text-align: left;">
+
+
+        <div class="mc-field-group" style="margin: .3em 5%;clear: both;overflow: hidden;">
+        <label for="mce-EMAIL" style="display: block;line-height: 1.5em;font-weight: bold;">Email Address <strong class="note-required">*</strong>
+        </label>
+        <input type="text" value="" name="EMAIL" class="required email" id="mce-EMAIL" style="margin-right: 1.5em;padding: .2em .3em;width: 95%;float: left;z-index: 999;">
+        </div>
+        		<div id="mce-responses" style="float: left;top: -1.4em;padding: 0em .5em 0em .5em;overflow: hidden;width: 90%;margin: 0 5%;clear: both;">
+        			<div class="response" id="mce-error-response" style="display: none;margin: 1em 0;padding: 1em .5em .5em 0;font-weight: bold;float: left;top: -1.5em;z-index: 1;width: 80%;background: FBE3E4;color: #D12F19;"></div>
+        			<div class="response" id="mce-success-response" style="display: none;margin: 1em 0;padding: 1em .5em .5em 0;font-weight: bold;float: left;top: -1.5em;z-index: 1;width: 80%;background: #E3FBE4;color: #529214;"></div>
+        		</div>
+        		<div>
+        		<input type="submit" value="Subscribe" name="subscribe" id="mc-embedded-subscribe" class="button" style="clear: both;width: auto;display: block;margin: 1em 0 1em 5%;"></div>
+        	</fieldset>	
+        	<a href="#" id="mc_embed_close" class="mc_embed_close" style="display: none;">Close</a>
+        </form>
+        </p>
+    </div>
+    <?php
+}
 function wp_appstore_page_view_plugin($plugin_info){
     $appstore = new WP_AppStore();
     ?>
@@ -1023,7 +1353,7 @@ Please enter your email below and we will notify you when you can download an up
                                 <?php if(sizeof($plugin_info->tags) > 0): ?>
                                 <li>Tags:
                                 <?php foreach($plugin_info->tags as $tag): ?>
-                                <a href="#" style="text-transform: capitalize; margin-right: 5px;"><?php echo $tag; ?></a>
+                                <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'tag-filter','tag'=>$tag,'plugin'=>'1'))); ?>" style="text-transform: capitalize; margin-right: 5px;"><?php echo $tag; ?></a>
                                 <?php endforeach; ?>
                                 </li>
                                 <?php endif; ?>
@@ -1132,9 +1462,24 @@ Please enter your email below and we will notify you when you can download an up
                         <p>
                             <ul style="margin-left:10px;font-weight:bold;">
                                 <li>Released: <?php echo date('d M, Y', strtotime($theme_info->updated));?></li>
-                                <li>Version: <?php echo $theme_info->version;?></li>
-                                <li>Category: <a href="#"><?php echo $theme_info->category_title;?></a></li>
-                                <li>Rating: <span class="star<?php echo $theme_info->rating;?>" style="padding-left:95px;color:#999;"><?php echo $theme_info->votes;?> ratings</span></li>
+                                <li>Version: <?php echo $theme_info->version; ?></li>
+                                <?php if(sizeof($theme_info->tags) > 0): ?>
+                                <li>Tags:
+                                <?php foreach($theme_info->tags as $tag): ?>
+                                <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'tag-filter','tag'=>$tag,'theme'=>'1'))); ?>" style="text-transform: capitalize; margin-right: 5px;"><?php echo $tag; ?></a>
+                                <?php endforeach; ?>
+                                </li>
+                                <?php endif; ?>
+                                <li>Rating:
+                                <div title="<?php printf( _n( '(based on %s rating)', '(based on %s ratings)', $theme_info->votes ), number_format_i18n( $theme_info->votes ) ) ?>" class="star-holder">
+            					<div style="width: <?php echo esc_attr( $theme_info->rating ) ?>px" class="star star-rating"></div>
+            					<div class="star star5"><img alt="5 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
+            					<div class="star star4"><img alt="4 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
+            					<div class="star star3"><img alt="3 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
+            					<div class="star star2"><img alt="2 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
+            					<div class="star star1"><img alt="1 star" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
+            				    </div>
+                                </li>
                                 <li></li>
                             </ul>
                         </p>
@@ -1196,7 +1541,7 @@ Please enter your email below and we will notify you when you can download an up
 }
 
 function wp_appstore_main() {
-    $pages = array('store','view-plugin', 'view-theme', 'install-plugin', 'install-theme', 'autoupdate', 'plugin-update');
+    $pages = array('store', 'search', 'tag-filter', 'all-plugins', 'all-themes', 'view-plugin', 'view-theme', 'install-plugin', 'install-theme', 'autoupdate', 'plugin-update');
     $page = '';
     if(!isset($_GET['screen']) || !in_array($_GET['screen'],$pages)){
         $page = 'store';
@@ -1213,6 +1558,101 @@ function wp_appstore_main() {
                 $plugin_info = $appstore->get_plugin(intval($_GET['plugin_id']));
                 if($plugin_info != null){
                     wp_appstore_page_view_plugin($plugin_info);
+                } else {
+                    wp_appstore_page_store();
+                }
+            } else {
+                wp_appstore_page_store();
+            }
+            break;
+        case 'search':
+            if(isset($_GET['s']) && (strlen($_GET['s']) > 3)){
+                //s=keyword&plugin=1&theme=1
+                if (isset($_GET['plugin']))
+                    $type = 'plugin';
+                elseif(isset($_GET['theme']))
+                    $type = 'theme';
+                else
+                    $type = '';
+                if (isset($_GET['plugin']) && isset($_GET['theme']))
+                    $type = '';
+                $appstore = new WP_AppStore();
+                $result = $appstore->search($_GET['s'], $type);
+                if ( !$result['plugin'] && !$result['theme'] )
+                    $result['serched_for'] = sprintf('No matches found for "%s" in formulas library', $_GET['s']);
+                else
+                    $result['serched_for'] = sprintf('Search results for "%s" from formulas library:', $_GET['s']);
+                $result['keyword'] = $_GET['s'];
+                $result['appstore_object'] = $appstore;
+                if(sizeof($result) > 0){
+                    wp_appstore_page_search_results($result);
+                } else {
+                    wp_appstore_page_store();
+                }
+            } else {
+                wp_appstore_page_store();
+            }
+            break;
+        case 'tag-filter':
+            if(isset($_GET['tag']) && (strlen($_GET['tag']) > 2)){
+                //s=keyword&plugin=1&theme=1
+                if (isset($_GET['plugin']))
+                    $type = 'plugin';
+                elseif(isset($_GET['theme']))
+                    $type = 'theme';
+                else
+                    $type = '';
+                if (isset($_GET['plugin']) && isset($_GET['theme']))
+                    $type = '';
+                $appstore = new WP_AppStore();
+                $result = $appstore->get_items_by_tag($_GET['tag'], $type);
+                if ( !$result['plugin'] && !$result['theme'] )
+                    $result['serched_for'] = sprintf('Ooops. Seems like we don\'t have "%s" tag attached to any items in formulas library', $_GET['tag']);
+                else
+                    $result['serched_for'] = sprintf('Items with "%s" tag from formulas library:', $_GET['tag']);
+                $result['tag'] = $_GET['tag'];
+                $result['appstore_object'] = $appstore;
+                if(sizeof($result) > 0){
+                    wp_appstore_page_search_results($result);
+                } else {
+                    wp_appstore_page_store();
+                }
+            } else {
+                wp_appstore_page_store();
+            }
+            break;
+            
+            
+/*
+$appstore = new WP_AppStore();
+    $plugins = $appstore->get_plugins();
+    $themes = $appstore->get_themes();
+    $appstore->check_for_plugins_updates();
+    $updates = get_option('wp_appstore_for_update', array());
+    $stats = $appstore->get_stats();
+    $tags = $appstore->get_tags('plugin')
+*/
+        case 'all-plugins':
+            $appstore = new WP_AppStore();
+            if($result['plugin'] = $appstore->get_plugins()){
+                $result['tags'] = $appstore->get_tags('plugin');
+                $result['appstore_object'] = $appstore;
+                if(sizeof($result) > 0){
+                    wp_appstore_page_search_results($result);
+                } else {
+                    wp_appstore_page_store();
+                }
+            } else {
+                wp_appstore_page_store();
+            }
+            break;
+        case 'all-themes':
+            $appstore = new WP_AppStore();
+            if($result['theme'] = $appstore->get_themes()){
+                $result['tags'] = $appstore->get_tags('theme');
+                $result['appstore_object'] = $appstore;
+                if(sizeof($result) > 0){
+                    wp_appstore_page_search_results($result);
                 } else {
                     wp_appstore_page_store();
                 }
@@ -1320,6 +1760,7 @@ function wp_appstore_main() {
                     }else{
                         if (!isset($current->response[$plugin])) {
                             $current->response[$plugin] = $for_update[$plugin_slug]['object'];
+                            set_site_transient('update_plugins', $current);
                         }
                     }
             		$title = sprintf( __('Update Plugin: %s'), 'WP Appstore');
@@ -1341,11 +1782,11 @@ function wp_appstore_main() {
         case 'plugin-update':
             if ( ! current_user_can('update_plugins') )
     			wp_die(__('You do not have sufficient permissions to update plugins for this site.'));
-             if(isset($_GET['plugin']) && (strlen($_GET['plugin']) > 1)){
+             if(isset($_GET['plugin_name']) && (strlen($_GET['plugin_name']) > 1)){
                 // include_once ABSPATH . 'wp-admin/includes/plugin-install.php'; //for plugins_api..
                 // check_admin_referer('install-plugin_' . $plugin);
                 // $plugin here is 'folder/file.php', $plugin_slug is a slug.
-                    $plugin_slug = $_GET['plugin'];
+                    $plugin_slug = $_GET['plugin_name'];
                     $current = get_site_transient( 'update_plugins' );
                     if (!is_object($current)) {
                         wp_update_plugins();
@@ -1358,6 +1799,7 @@ function wp_appstore_main() {
                     }else{
                         if (!isset($current->response[$plugin])) {
                             $current->response[$plugin] = $for_update[$plugin_slug]['object'];
+                            set_site_transient('update_plugins', $current);
                         }
                     }
           			$title = __('Update Plugin');
@@ -1369,9 +1811,9 @@ function wp_appstore_main() {
                     $url = 'update.php?action=upgrade-plugin&plugin=' . $plugin;
 
             		$upgrader = new Plugin_Upgrader( new Plugin_Upgrader_Skin( compact('title', 'nonce', 'url', 'plugin') ) );
-            		$upgrader->upgrade($plugin);
-                    unset($for_update[$plugin_slug]);
-                    update_option('wp_appstore_for_update', $for_update);
+                    $upgrader->upgrade($plugin);
+                    //unset($for_update[$plugin_slug]);
+                    //update_option('wp_appstore_for_update', $for_update);
             }
             break;
     }
@@ -1469,6 +1911,7 @@ function wp_appstore_update_formulas() {
     unlink($tmp_file_name);
     unlink($wp_appstore_plugin);
     update_option('wp_appstore_formulas_rescan', true);
+    update_option('wp_appstore_last_lib_update', time());
 }
 
 function wp_appstore_set_db_tables(){
@@ -1487,6 +1930,7 @@ CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_plugins` (
   `requires` varchar(10) NOT NULL,
   `tested` varchar(10) NOT NULL,
   `link` varchar(255) NOT NULL,
+  `icon` VARCHAR( 255 ) NOT NULL AFTER,
   `homepage` varchar(255) NOT NULL,
   `rating` varchar(10) NOT NULL,
   `votes` int(11) NOT NULL,
@@ -1520,6 +1964,7 @@ CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_themes` (
   `version` varchar(10) NOT NULL,
   `updated` varchar(50) NOT NULL,
   `link` varchar(255) NOT NULL,
+  `icon` VARCHAR( 255 ) NOT NULL AFTER,
   `preview_url` varchar(255) NOT NULL,
   `homepage` varchar(255) NOT NULL,
   `rating` varchar(10) NOT NULL,
@@ -1541,7 +1986,9 @@ $wpdb->query($sql);
 
 function wp_appstore_activation() {
     wp_appstore_set_db_tables();
-    wp_appstore_update_formulas();
+    //wp_appstore_update_formulas();
+    update_option('wp_appstore_formulas_rescan', true);
+    update_option('wp_appstore_last_lib_update', time());
     $a = new WP_AppStore;
 	wp_schedule_event(time(), 'daily', 'wp_appstore_daily_event');
 }
@@ -1559,6 +2006,7 @@ function wp_appstore_uninstall() {
     delete_option('wp_appstore_formulas_rescan');
     delete_option('wp_appstore_autoupdate_request');
     delete_option('wp_appstore_for_update');
+    delete_option('wp_appstore_last_lib_update');
 }
 add_action('admin_init', 'wp_appstore_admin_init');
 add_action('admin_menu', 'wp_appstore_admin_menu');

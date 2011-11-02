@@ -139,3 +139,11 @@ div.star img {
     list-style-type: circle !important;
     margin-left:15px;
 }
+ul.search-options {
+    float: left;
+    margin: 8px 0px 0px 8px;
+}
+input#search-submit {
+   float: right;
+   margin: 12px 15px 0px 0px;
+}
