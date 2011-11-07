@@ -6,8 +6,6 @@
  */
 @ini_set( 'max_execution_time', 360 );
 // TODO route this pages via a specific iframe handler instead of the do_action below
-if ( !defined( 'IFRAME_REQUEST' ) && isset( $_GET['tab'] ) && ( 'plugin-information' == $_GET['tab'] ) )
-	//define( 'IFRAME_REQUEST', true );
 
 /** WordPress Administration Bootstrap */
 require_once('../../../../wp-config.php');
@@ -17,7 +15,11 @@ require_once(ABSPATH.'/wp-admin/admin.php');
 //require_once (ABSPATH.'/wp-admin/plugins.php');
 require_once (ABSPATH.'/wp-admin/includes/plugin-install.php');
 require_once (ABSPATH.'/wp-admin/includes/theme-install.php');
+include 'markdownify_extra.php';
 
+
+//$md = new Markdownify(true, MDFY_BODYWIDTH, true);
+$md = new Markdownify_Extra(false, MDFY_BODYWIDTH, false);
 
 $args = array( 'page' => $paged, 'per_page' => 50 );
 $args['browse'] = 'popular';
@@ -48,7 +50,7 @@ foreach ($api->plugins as $plugin) {
                  $output .= "type = plugin\n";
                  $output .= "title = \"{$plugin->name}\"\n";
                  $output .= "slug = \"{$plugin->slug}\"\n";
-                 $description = escape_quotes($plugin->sections['description']);
+                 $description = escape_quotes($md->parseString($plugin->sections['description']));
                  $output .= "description = \"{$description}\"\n";
                  $author = escape_quotes($plugin->author);
                  $output .= "author = \"{$author}\"\n";
@@ -66,9 +68,13 @@ foreach ($api->plugins as $plugin) {
                     }
                  }
                  
+                 $output .= "[category]\n";
+                 $output .= "category_slug = \"\"\n";
+                 $output .= "category_name = \"\"\n";
+                 
                  $output .= "[assets]\n";
                  $output .= "link = \"{$plugin->download_link}\"\n";
-                 //$output .= "icon = \"{$plugin->icon}\"\n";
+                 $output .= "icon = \"\"\n";
                  if (sizeof($ss) > 0) {
                     foreach ($ss as $s) {
                         $output .= "screenshots[] = \"{$s}\"\n";
@@ -76,6 +82,7 @@ foreach ($api->plugins as $plugin) {
                  }
                  
                  $output .= "[info]\n";
+                 $output .= "featured = \"\"\n";
                  $output .= "homepage = \"{$plugin->homepage}\"\n";
                  $output .= "rating = \"{$plugin->rating}\"\n";
                  $output .= "votes = \"{$plugin->num_ratings}\"\n";
@@ -103,7 +110,7 @@ foreach ($api->themes as $theme) {
                  //$output .= "id = {$theme->id}\n";
                  $output .= "title = \"{$theme->name}\"\n";
                  $output .= "slug = \"{$theme->slug}\"\n";
-                 $description = escape_quotes($theme->sections['description']);
+                 $description = escape_quotes($md->parseString($theme->sections['description']));
                  $output .= "description = \"{$description}\"\n";
                  $author = escape_quotes($theme->author);
                  $output .= "author = \"{$author}\"\n";
@@ -121,15 +128,20 @@ foreach ($api->themes as $theme) {
                     }
                  }
                  
+                 $output .= "[category]\n";
+                 $output .= "category_slug = \"\"\n";
+                 $output .= "category_name = \"\"\n";
+                 
                  $output .= "[assets]\n";
                  $output .= "link = \"{$theme->download_link}\"\n";
-                 //$output .= "icon = \"{$theme->icon}\"\n";
+                 $output .= "icon = \"\"\n";
                  
                  if ($theme->screenshot_url) {   
                         $output .= "screenshots[] = \"$theme->screenshot_url\"\n";
                  }
                  
                  $output .= "[info]\n";
+                 $output .= "featured = \"\"\n";
                  $output .= "preview_url = \"{$theme->preview_url}\"\n";
                  $output .= "homepage = \"{$theme->homepage}\"\n";
                  $output .= "rating = \"{$theme->rating}\"\n";
@@ -148,6 +160,8 @@ foreach ($api->themes as $theme) {
 function escape_quotes($str){
     $str = str_replace("'", "&#039;", $str);
     $str = str_replace('"', "&quot;", $str);
+    $str = str_replace('[', "\[", $str);
+    $str = str_replace(']', "\]", $str);
     return $str;
 }
 ?>
