@@ -69,8 +69,8 @@ foreach ($api->plugins as $plugin) {
                  }
                  
                  $output .= "[category]\n";
-                 $output .= "category_slug = \"\"\n";
-                 $output .= "category_name = \"\"\n";
+                 $output .= "category_slug = \"uncategorized\"\n";
+                 $output .= "category_name = \"Uncategorized\"\n";
                  
                  $output .= "[assets]\n";
                  $output .= "link = \"{$plugin->download_link}\"\n";
@@ -82,7 +82,7 @@ foreach ($api->plugins as $plugin) {
                  }
                  
                  $output .= "[info]\n";
-                 $output .= "featured = \"\"\n";
+                 $output .= "featured = 0\n";
                  $output .= "homepage = \"{$plugin->homepage}\"\n";
                  $output .= "rating = \"{$plugin->rating}\"\n";
                  $output .= "votes = \"{$plugin->num_ratings}\"\n";
@@ -129,19 +129,19 @@ foreach ($api->themes as $theme) {
                  }
                  
                  $output .= "[category]\n";
-                 $output .= "category_slug = \"\"\n";
-                 $output .= "category_name = \"\"\n";
+                 $output .= "category_slug = \"none\"\n";
+                 $output .= "category_name = \"Not Categorized\"\n";
                  
                  $output .= "[assets]\n";
                  $output .= "link = \"{$theme->download_link}\"\n";
-                 $output .= "icon = \"\"\n";
                  
-                 if ($theme->screenshot_url) {   
+                 if ($theme->screenshot_url) {
+                        $output .= "icon = \"{$theme->screenshot_url}\"\n";
                         $output .= "screenshots[] = \"$theme->screenshot_url\"\n";
                  }
                  
                  $output .= "[info]\n";
-                 $output .= "featured = \"\"\n";
+                 $output .= "featured = 0\n";
                  $output .= "preview_url = \"{$theme->preview_url}\"\n";
                  $output .= "homepage = \"{$theme->homepage}\"\n";
                  $output .= "rating = \"{$theme->rating}\"\n";

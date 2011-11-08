@@ -224,7 +224,7 @@ function wp_appstore_page_store(){
                     <div class="inside">
                         <?php foreach($featured_themes as $one): ?>
                         <div class="theme">
-                            <img class="scrot" width="280px" src="<?php echo $one->screenshots[0]; ?>" alt="" />
+                            <img class="scrot" width="280px" src="<?php echo icon_path($one); ?>" alt="" />
                             <a class="title" href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'view-theme','theme_name'=>$one->slug,'theme_id'=>$one->id)));?>"><?php echo $one->title; ?></a>
                             <span class="category"><?php echo $one->category_name; ?></span>
 
@@ -239,8 +239,8 @@ function wp_appstore_page_store(){
                     <h3><label for="link_url">Lastest Themes</label> - <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'all-themes')));?>" title="All Themes">All Themes</a></h3>
                     <div class="inside">
                         <?php foreach($latest_themes as $one): ?>
-                        <div class="plugin">
-                            <img class="logo" src="<?php echo icon_path($one); ?>" alt="" />
+                        <div class="theme">
+                            <img class="scrot" width="280px" src="<?php echo icon_path($one); ?>" alt="" />
                             <a class="title" href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'view-theme','theme_name'=>$one->slug,'theme_id'=>$one->id)));?>"><?php echo $one->title; ?></a>
                             <span class="category"><?php echo $one->category_name; ?></span>
 
@@ -1365,7 +1365,7 @@ CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}appstore_themes` (
   `version` varchar(10) NOT NULL,
   `updated` varchar(50) NOT NULL,
   `category_slug` VARCHAR(255) NOT NULL DEFAULT 'none',
-  `category_name` VARCHAR(255) NOT NULL DEFAULT 'Not Categorised',
+  `category_name` VARCHAR(255) NOT NULL DEFAULT 'Not Categorized',
   `link` varchar(255) NOT NULL,
   `icon` VARCHAR(255) NOT NULL,
   `preview_url` varchar(255) NOT NULL,

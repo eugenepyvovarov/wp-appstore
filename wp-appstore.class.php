@@ -560,7 +560,7 @@ class WP_AppStore{
                             $wpdb->insert(  
                                 $wpdb->prefix."appstore_themes",  
                                 $tm,  
-                                array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' )  
+                                array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' )  
                             );
                             
                             $theme_id = $wpdb->insert_id;
@@ -596,7 +596,7 @@ class WP_AppStore{
                                     $wpdb->prefix."appstore_themes",  
                                     $tm,  
                                     array( 'id' => $theme_id),  
-                                    array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' ),  
+                                    array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' ),  
                                     array( '%d' )  
                                 );
                                 
@@ -633,7 +633,7 @@ class WP_AppStore{
                             $wpdb->insert(  
                                 $wpdb->prefix."appstore_plugins",  
                                 $tm,  
-                                array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' )  
+                                array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' )  
                             );
 
                             $plugin_id = $wpdb->insert_id;

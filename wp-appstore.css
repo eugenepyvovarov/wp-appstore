@@ -6,6 +6,9 @@
     width:300px;
     padding:10px 7px;
 }
+.theme {
+    height: 291px;
+}
 .plugin:hover, .theme:hover{
     background:#f5f5f5;
 } 
