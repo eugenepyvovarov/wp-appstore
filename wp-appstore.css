@@ -9,6 +9,9 @@
 .theme {
     height: 291px;
 }
+.plugin {
+    height: 84px;
+}
 .plugin:hover, .theme:hover{
     background:#f5f5f5;
 } 

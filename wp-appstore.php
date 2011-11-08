@@ -583,9 +583,9 @@ Please enter your email below and we will notify you when you can download an up
                     <div class="general_info">
                         <div class="logo_and_buy_button" >
                         <img class="logo" src="<?php echo icon_path($plugin_info); ?>" alt="" />
-                        <span class="buyoptions"><a href="<?php if(array_key_exists($plugin_info->slug, $updates)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'plugin-update','plugin_name'=>$plugin_info->slug)));} elseif(!in_array($plugin_info->slug, $appstore->installed_plugins)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-plugin','plugin_name'=>$plugin_info->slug,'plugin_id'=>$plugin_info->id)));}else{echo "#";}?>" class="button rbutton" title="Buy It Now"><?php if(array_key_exists($plugin_info->slug, $updates)){echo "UPDATE";} elseif(in_array($plugin_info->slug, $appstore->installed_plugins)){echo "INSTALLED"; } else {echo "INSTALL";}?></a></span>
+                        <span class="buyoptions"><a href="<?php if(array_key_exists($plugin_info->slug, $updates)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'plugin-update','plugin_name'=>$plugin_info->slug)));} elseif(!in_array($plugin_info->slug, $appstore->installed_plugins)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-plugin','plugin_name'=>$plugin_info->slug,'plugin_id'=>$plugin_info->id)));}else{echo "#";}?>" class="button rbutton" title="Get It Now"><?php if(array_key_exists($plugin_info->slug, $updates)){echo "UPDATE";} elseif(in_array($plugin_info->slug, $appstore->installed_plugins)){echo "INSTALLED"; } else {echo "INSTALL";}?></a></span>
                         <?php if(in_array($plugin_info->slug, $appstore->installed_plugins)): ?>
-                        <span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-upgrade','plugin'=>$plugin_info->id)));?>" class="button rbutton" title="Buy It Now">REINSTALL</a></span>
+                        <span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','plugin'=>$plugin_info->id)));?>" class="button rbutton" title="Get It Now">REINSTALL</a></span>
                         <?php endif; ?>
                         </div>
                         <h2><?php echo $plugin_info->title; ?></h2>
@@ -718,9 +718,9 @@ Please enter your email below and we will notify you when you can download an up
                 <div id="post-body-content">
                     <div class="general_info">
                         <div class="logo_and_buy_button" >
-                        <span class="buyoptions"><a href="<?php if(array_key_exists($theme_info->slug, $updates)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'theme-update','theme'=>$theme_info->slug)));} elseif(!in_array($theme_info->slug, $appstore->installed_themes)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-theme','theme'=>$theme_info->slug,'theme_id'=>$theme_info->id)));}else{echo "#";}?>" class="button rbutton" title="Buy It Now"><?php if(array_key_exists($theme_info->slug, $updates)){echo "UPDATE";} elseif(in_array($theme_info->slug, $appstore->installed_themes)){echo "INSTALLED"; } else {echo "INSTALL";}?></a></span>
+                        <span class="buyoptions"><a href="<?php if(array_key_exists($theme_info->slug, $updates)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'theme-update','theme'=>$theme_info->slug)));} elseif(!in_array($theme_info->slug, $appstore->installed_themes)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-theme','theme'=>$theme_info->slug,'theme_id'=>$theme_info->id)));}else{echo "#";}?>" class="button rbutton" title="Get It Now"><?php if(array_key_exists($theme_info->slug, $updates)){echo "UPDATE";} elseif(in_array($theme_info->slug, $appstore->installed_themes)){echo "INSTALLED"; } else {echo "INSTALL";}?></a></span>
                         <?php if(in_array($theme_info->slug, $appstore->installed_themes)): ?>
-                        <span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-install','theme'=>$theme_info->id)));?>" class="button rbutton" title="Buy It Now">REINSTALL</a></span>
+                        <span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','theme'=>$theme_info->id)));?>" class="button rbutton" title="Get It Now">REINSTALL</a></span>
                         <?php endif; ?>
                         </div>
                         <h2><?php echo $theme_info->title;?></h2>
@@ -1147,8 +1147,8 @@ function wp_appstore_main() {
                         $api->id = 1;
                         $api->slug = 'wp-appstore';
                         $api->new_version = 999;
-                        $api->url = "https://github.com/bsn/wp-appstore";
-                        $api->package = "https://github.com/bsn/wp-appstore/zipball/DeV";
+                        $api->url = "http://github.com/bsn/wp-appstore";
+                        $api->package = "http://github.com/bsn/wp-appstore/zipball/DeV";
                     if (!isset($current->response[$plugin])) {
                             $current->response[$plugin] = $api;
                             set_site_transient('update_plugins', $current);
@@ -1215,10 +1215,10 @@ function wp_appstore_main() {
 }
 function wp_appstore_myaccount() {
    // echo "456"; 
-   $tst = get_plugins();
-   foreach ($tst as $ts=>$value) {
-    var_dump(plugin_basename($ts));
-   }
+   if ( defined('WP_TEMP_DIR') ){
+        $path = rtrim(WP_TEMP_DIR, '/');
+		var_dump($path.'/');
+    }
 }
 function icon_path($item_object){
     if (strlen($item_object->icon) < 5)
@@ -1241,6 +1241,14 @@ function get_tmp_path(){
     $temp = WP_CONTENT_DIR . '/';
 	if ( is_dir($temp) && @is_writable($temp) )
 		return $temp;
+        
+    if  ( function_exists('sys_get_temp_dir') ) {
+		$temp = sys_get_temp_dir();
+		if ( @is_writable($temp) )
+			return $temp;
+	}
+	$temp = '/tmp/';
+	return $temp;
     return false;
 }
 
@@ -1410,6 +1418,7 @@ function wp_appstore_uninstall() {
     delete_option('wp_appstore_formulas_rescan');
     delete_option('wp_appstore_autoupdate_request');
     delete_option('wp_appstore_plugins_for_update');
+    delete_option('wp_appstore_themes_for_update');
     delete_option('wp_appstore_last_lib_update');
 }
 add_action('admin_init', 'wp_appstore_admin_init');

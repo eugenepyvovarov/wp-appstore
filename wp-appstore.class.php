@@ -303,18 +303,15 @@ class WP_AppStore{
         $this->set_formulas();
     }
     function set_formulas(){
-
-        if ( get_option('wp_appstore_formulas_rescan') ) {
+        $this->get_formulas_from_db();
+        if ( (get_option('wp_appstore_formulas_rescan')) || (!$this->formulas) ) {
             $this->dir = rtrim(dirname(__FILE__), '/\\') . DIRECTORY_SEPARATOR . 'formulas';
             $this->ini_files = array();
             $this->recurse_directory($this->dir);
             $this->store();
             $this->check_for_plugins_updates();
             $this->check_for_themes_updates();
-        }else{
-            $this->get_formulas_from_db();
         }
-        
     }
     function get_installed_plugins() {
     	$dir = WP_PLUGIN_DIR;
@@ -557,6 +554,8 @@ class WP_AppStore{
 //Insert new themes                        
                         if (($tm['type'] == 'theme') && (!isset($stored_themes[$tm['slug']]))) {
                             unset($tm['type']);
+                            $mold = array('title'=>'', 'slug'=>'', 'description'=>'', 'author'=>'', 'version'=>'', 'updated'=>'', 'category_slug'=>'', 'category_name'=>'', 'link'=>'', 'icon'=>'', 'preview_url'=>'', 'homepage'=>'', 'featured'=>'', 'rating'=>'', 'votes'=>'', 'downloaded'=>'', 'price'=>'');
+                            $tm = array_merge($mold, $tm);
                             $wpdb->insert(  
                                 $wpdb->prefix."appstore_themes",  
                                 $tm,  
@@ -592,6 +591,8 @@ class WP_AppStore{
                         if (($tm['type'] == 'theme') && (isset($stored_themes[$tm['slug']]))) {
                             $theme_id = $stored_themes[$tm['slug']];
                             unset($stored_themes[$tm['slug']]);
+                            $mold = array('title'=>'', 'slug'=>'', 'description'=>'', 'author'=>'', 'version'=>'', 'updated'=>'', 'category_slug'=>'', 'category_name'=>'', 'link'=>'', 'icon'=>'', 'preview_url'=>'', 'homepage'=>'', 'featured'=>'', 'rating'=>'', 'votes'=>'', 'downloaded'=>'', 'price'=>'');
+                            $tm = array_merge($mold, $tm);
                                 $wpdb->update(
                                     $wpdb->prefix."appstore_themes",  
                                     $tm,  
@@ -630,10 +631,12 @@ class WP_AppStore{
 //Insert new plugins                        
                         if (($tm['type'] == 'plugin') && (!isset($stored_plugins[$tm['slug']]))) {
                             unset($tm['type']);
+                            $mold = array('title'=>'', 'slug'=>'', 'description'=>'', 'author'=>'', 'version'=>'', 'updated'=>'', 'added'=>'', 'requires'=>'', 'tested'=>'', 'category_slug'=>'', 'category_name'=>'', 'link'=>'', 'icon'=>'', 'homepage'=>'', 'featured'=>'', 'rating'=>'', 'votes'=>'', 'downloaded'=>'', 'price'=>'');
+                            $tm = array_merge($mold, $tm);
                             $wpdb->insert(  
                                 $wpdb->prefix."appstore_plugins",  
                                 $tm,  
-                                array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' )  
+                                array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%d', '%d' )  
                             );
 
                             $plugin_id = $wpdb->insert_id;
@@ -664,11 +667,13 @@ class WP_AppStore{
                         if (($tm['type'] == 'plugin') && (isset($stored_plugins[$tm['slug']]))) {
                             $plugin_id = $stored_plugins[$tm['slug']];
                             unset($stored_plugins[$tm['slug']]);
+                            $mold = array('title'=>'', 'slug'=>'', 'description'=>'', 'author'=>'', 'version'=>'', 'updated'=>'', 'added'=>'', 'requires'=>'', 'tested'=>'', 'category_slug'=>'', 'category_name'=>'', 'link'=>'', 'icon'=>'', 'homepage'=>'', 'featured'=>'', 'rating'=>'', 'votes'=>'', 'downloaded'=>'', 'price'=>'');
+                            $tm = array_merge($mold, $tm);
                                 $wpdb->update(
                                     $wpdb->prefix."appstore_plugins",  
                                     $tm,
                                     array( 'id' => $plugin_id),  
-                                    array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d' ),  
+                                    array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%d', '%d' ),  
                                     array( '%d' )  
                                 );
                                 
