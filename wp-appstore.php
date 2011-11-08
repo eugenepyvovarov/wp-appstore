@@ -1188,10 +1188,10 @@ function wp_appstore_main() {
                         $api->new_version = 999;
                         $api->url = $plugin->homepage;
                         $api->package = $plugin->link;
-                    if (!isset($current->response[$plugin_slug])) {
+                    
                             $current->response['force_update'] = $api;
                             set_site_transient('update_plugins', $current);
-                        }
+                        
                     }else{
                         wp_die(__('Update failed'));
                     }
