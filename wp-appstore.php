@@ -37,7 +37,7 @@ function wp_appstore_page_store(){
     
     $updates = get_option('wp_appstore_plugins_for_update', array());
     $stats = $appstore->get_stats();
-
+//wp_appstore_prepare_package('https://github.com/bsn/wp-appstore/zipball/master', 'wp-appstore');
     //var_dump(wp_appstore_myaccount());
     //var_dump($appstore->get_tags('plugin', false, false));
     //wp_appstore_update_formulas();
@@ -319,7 +319,19 @@ function wp_appstore_page_search_results($results){
                 <div class="inside">
                     <p>
                     <?php foreach($tags as $tag): ?>
-                        <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'tag-filter','tag'=>$tag,'plugin'=>'1'))); ?>" style="text-transform: capitalize; margin-right: 5px;"><?php echo $tag; ?></a>
+                    <?php
+                    $tags_type = '';
+                    if (sizeof($plugins) > 0) {
+                            $tags_type = array('plugin'=>'1');
+                    } 
+                    if (sizeof($themes) > 0 ) {
+                            $tags_type = array('theme'=>'1');
+                    } 
+                    if (sizeof($plugins) > 0 && sizeof($themes) > 0 ) {
+                            $tags_type = '';
+                    } 
+                    ?>
+                        <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'tag-filter','tag'=>$tag,$tags_type))); ?>" style="text-transform: capitalize; margin-right: 5px;"><?php echo $tag; ?></a>
                     <?php endforeach; ?>
                     </p>
                 </div>
@@ -554,11 +566,11 @@ Please enter your email below and we will notify you when you can download an up
                                 <li>Rating:
                                 <div title="<?php printf( _n( '(based on %s rating)', '(based on %s ratings)', $plugin_info->votes ), number_format_i18n( $plugin_info->votes ) ) ?>" class="star-holder">
             					<div style="width: <?php echo esc_attr( $plugin_info->rating ) ?>px" class="star star-rating"></div>
-            					<div class="star star5"><img alt="5 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
-            					<div class="star star4"><img alt="4 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
-            					<div class="star star3"><img alt="3 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
-            					<div class="star star2"><img alt="2 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
-            					<div class="star star1"><img alt="1 star" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
+            					<div class="star star5"><img alt="5 stars" src="<?php echo plugins_url( 'images/gray-star.png?v=20110615', __FILE__ ); ?>"></div>
+            					<div class="star star4"><img alt="4 stars" src="<?php echo plugins_url( 'images/gray-star.png?v=20110615', __FILE__ ); ?>"></div>
+            					<div class="star star3"><img alt="3 stars" src="<?php echo plugins_url( 'images/gray-star.png?v=20110615', __FILE__ ); ?>"></div>
+            					<div class="star star2"><img alt="2 stars" src="<?php echo plugins_url( 'images/gray-star.png?v=20110615', __FILE__ ); ?>"></div>
+            					<div class="star star1"><img alt="1 star" src="<?php echo plugins_url( 'images/gray-star.png?v=20110615', __FILE__ ); ?>"></div>
             				    </div>
                                 </li>
                                 <li></li>
@@ -689,11 +701,11 @@ Please enter your email below and we will notify you when you can download an up
                                 <li>Rating:
                                 <div title="<?php printf( _n( '(based on %s rating)', '(based on %s ratings)', $theme_info->votes ), number_format_i18n( $theme_info->votes ) ) ?>" class="star-holder">
             					<div style="width: <?php echo esc_attr( $theme_info->rating ) ?>px" class="star star-rating"></div>
-            					<div class="star star5"><img alt="5 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
-            					<div class="star star4"><img alt="4 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
-            					<div class="star star3"><img alt="3 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
-            					<div class="star star2"><img alt="2 stars" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
-            					<div class="star star1"><img alt="1 star" src="<?php echo admin_url( 'images/gray-star.png?v=20110615' ); ?>"></div>
+            					<div class="star star5"><img alt="5 stars" src="<?php echo plugins_url( 'images/gray-star.png?v=20110615', __FILE__ ); ?>"></div>
+            					<div class="star star4"><img alt="4 stars" src="<?php echo plugins_url( 'images/gray-star.png?v=20110615', __FILE__ ); ?>"></div>
+            					<div class="star star3"><img alt="3 stars" src="<?php echo plugins_url( 'images/gray-star.png?v=20110615', __FILE__ ); ?>"></div>
+            					<div class="star star2"><img alt="2 stars" src="<?php echo plugins_url( 'images/gray-star.png?v=20110615', __FILE__ ); ?>"></div>
+            					<div class="star star1"><img alt="1 star" src="<?php echo plugins_url( 'images/gray-star.png?v=20110615', __FILE__ ); ?>"></div>
             				    </div>
                                 </li>
                                 <li></li>
@@ -785,7 +797,7 @@ function wp_appstore_main() {
             }
             break;
         case 'search':
-            if(isset($_GET['s']) && (strlen($_GET['s']) >= 3)){
+            if(isset($_GET['s']) && (strlen($_GET['s']) > 2)){
                 //s=keyword&plugin=1&theme=1
                 if (isset($_GET['plugin']))
                     $type = 'plugin';
@@ -933,7 +945,9 @@ function wp_appstore_main() {
                     $api->author = $plugin_info->author;
                     $api->required = '2.5';
                     $api->tested = '3.1.1';
-                    $api->download_link = $plugin_info->link;
+                    if (!$package = wp_appstore_prepare_package($plugin_info->link, $plugin_info->slug))
+                            $package = $plugin_info->link;
+                    $api->download_link = $package;
                     
             		if ( is_wp_error($api) )
             	 		wp_die($api);
@@ -1114,7 +1128,9 @@ function wp_appstore_main() {
                         $api = array();
                         $api['new_version'] = $theme_object->version;
                         $api['url'] = $theme_object->homepage;
-                        $api['package'] = $theme_object->link;
+                        if (!$package = wp_appstore_prepare_package($theme_object->link, $theme_object->slug))
+                            $package = $theme_object->link;
+                        $api['package'] = $package;
                         
                         if (!isset($current->response[$theme])) {
                             $current->response[$theme] = $api;
@@ -1148,11 +1164,11 @@ function wp_appstore_main() {
                         $api->slug = 'wp-appstore';
                         $api->new_version = 999;
                         $api->url = "http://github.com/bsn/wp-appstore";
-                        $api->package = "http://github.com/bsn/wp-appstore/zipball/DeV";
-                    if (!isset($current->response[$plugin])) {
-                            $current->response[$plugin] = $api;
-                            set_site_transient('update_plugins', $current);
-                        }    
+                        if (!$package = wp_appstore_prepare_package("http://github.com/bsn/wp-appstore/zipball/DeV", 'wp-appstore'))
+                            $package = "http://github.com/bsn/wp-appstore/zipball/DeV";
+                        $api->package = $package;
+                        $current->response[$plugin] = $api;
+                        set_site_transient('update_plugins', $current);   
                     
             		$title = sprintf( __('Update Plugin: %s'), 'WP Appstore');
                     
@@ -1187,10 +1203,11 @@ function wp_appstore_main() {
                         $api->slug = $plugin->slug;
                         $api->new_version = 999;
                         $api->url = $plugin->homepage;
-                        $api->package = $plugin->link;
-                    
-                            $current->response['force_update'] = $api;
-                            set_site_transient('update_plugins', $current);
+                        if (!$package = wp_appstore_prepare_package($plugin->link, $plugin->slug))
+                            $package = $plugin->link;
+                        $api->package = $package;
+                        $current->response['force_update'] = $api;
+                        set_site_transient('update_plugins', $current);
                         
                     }else{
                         wp_die(__('Update failed'));
@@ -1205,6 +1222,7 @@ function wp_appstore_main() {
                     $url = 'update.php?action=upgrade-plugin&plugin=' . $plugin_slug;
 
             		$upgrader = new Plugin_Upgrader( new Plugin_Upgrader_Skin( compact('title', 'nonce', 'url', 'plugin_slug') ) );
+                    set_site_transient('update_plugins', $current);
                     $upgrader->upgrade('force_update');
             }
             if(isset($_GET['formulas'])){
@@ -1243,7 +1261,7 @@ function get_tmp_path(){
 		return $temp;
         
     if  ( function_exists('sys_get_temp_dir') ) {
-		$temp = sys_get_temp_dir();
+		$temp = sys_get_temp_dir(). '/';
 		if ( @is_writable($temp) )
 			return $temp;
 	}
@@ -1317,6 +1335,40 @@ function wp_appstore_update_formulas() {
     unlink($wp_appstore_plugin);
     update_option('wp_appstore_formulas_rescan', true);
     update_option('wp_appstore_last_lib_update', time());
+}
+
+function wp_appstore_prepare_package($url, $folder_slug){
+    if (!$file = file_get_contents($url)) {
+        wp_die(__('We have an error while downloading package.'));
+    }
+    if (!get_tmp_path()) {
+        wp_die(__('We have an error while saving package.'));
+    }
+    $tmp_file_name = get_tmp_path().'tmp.zip';
+   // die($tmp_file_name);
+    file_put_contents($tmp_file_name, $file);
+    $zip = new ZipArchive;
+    $res = $zip->open( $tmp_file_name, ZIPARCHIVE::CREATE | ZIPARCHIVE::OVERWRITE );
+    if ($res === TRUE) {
+        $folder = rtrim($folder_slug, '/\\').'/';
+        $root_element = $zip->statIndex(0);
+        $search = $root_element['name'];
+        if ($folder != $search || $root_element['size'] > 0) {
+            $zip->close();
+            return $tmp_file_name;
+        }
+        for($i = 0; $i < $zip->numFiles; $i++)
+         {  
+            $new_name = str_replace($search, $folder, $zip->getNameIndex($i));
+            $zip->renameIndex($i, $new_name);
+         } 
+
+        $zip->close();
+        return $tmp_file_name;
+    } else {
+        echo 'failed, code:' . $res;
+        return false;
+    }
 }
 
 function wp_appstore_set_db_tables(){
