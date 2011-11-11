@@ -145,6 +145,52 @@ class WPAppstore_Plugin_Installer_Skin extends WPAppStore_Upgrader_Skin {
 			$this->feedback(implode(' | ', (array)$install_actions));
 	}
 }
+class WPAppstore_Plugin_Upgrader_Skin extends WPAppStore_Upgrader_Skin {
+	var $plugin = '';
+	var $plugin_active = false;
+	var $plugin_network_active = false;
+
+	function __construct($args = array()) {
+		$defaults = array( 'url' => '', 'plugin' => '', 'nonce' => '', 'title' => __('Update Plugin') );
+		$args = wp_parse_args($args, $defaults);
+
+		$this->plugin = $args['plugin'];
+
+		$this->plugin_active = is_plugin_active( $this->plugin );
+		$this->plugin_network_active = is_plugin_active_for_network( $this->plugin );
+
+		parent::__construct($args);
+	}
+
+	function after() {
+		$this->plugin = $this->upgrader->plugin_info();
+		if ( !empty($this->plugin) && !is_wp_error($this->result) && $this->plugin_active ){
+			show_message(__('Reactivating the plugin&#8230;'));
+			echo '<iframe style="border:0;overflow:hidden" width="100%" height="170px" src="' . wp_nonce_url('update.php?action=activate-plugin&networkwide=' . $this->plugin_network_active . '&plugin=' . $this->plugin, 'activate-plugin_' . $this->plugin) .'"></iframe>';
+		}
+
+		$update_actions =  array(
+			'activate_plugin' => '<a href="' . wp_nonce_url('plugins.php?action=activate&amp;plugin=' . $this->plugin, 'activate-plugin_' . $this->plugin) . '" title="' . esc_attr__('Activate this plugin') . '" target="_parent">' . __('Activate Plugin') . '</a>',
+			'plugins_page' => '<a href="' . self_admin_url('plugins.php') . '" title="' . esc_attr__('Go to plugins page') . '" target="_parent">' . __('Return to Plugins page') . '</a>',
+            'return_to_appstore' => '<a href="' . admin_url('admin.php') . '?page=wp-appstore.php" title="' . esc_attr__('Return to WP AppStore') . '" target="_parent">' . __('Return to WP AppStore') . '</a>',
+		);
+		if ( $this->plugin_active )
+			unset( $update_actions['activate_plugin'] );
+		if ( ! $this->result || is_wp_error($this->result) )
+			unset( $update_actions['activate_plugin'] );
+
+		$update_actions = apply_filters('update_plugin_complete_actions', $update_actions, $this->plugin);
+		if ( ! empty($update_actions) )
+			$this->feedback(implode(' | ', (array)$update_actions));
+	}
+
+	function before() {
+		if ( $this->upgrader->show_before ) {
+			echo $this->upgrader->show_before;
+			$this->upgrader->show_before = '';
+		}
+	}
+}
 class WPAppstore_Theme_Installer_Skin extends WPAppStore_Upgrader_Skin {
 	var $api;
 	var $type;
@@ -203,6 +249,47 @@ class WPAppstore_Theme_Installer_Skin extends WPAppStore_Upgrader_Skin {
 			$this->feedback(implode(' | ', (array)$install_actions));
 	}
 }
+class WPAppstore_Theme_Upgrader_Skin extends WPAppStore_Upgrader_Skin {
+	var $theme = '';
+
+	function __construct($args = array()) {
+		$defaults = array( 'url' => '', 'theme' => '', 'nonce' => '', 'title' => __('Update Theme') );
+		$args = wp_parse_args($args, $defaults);
+
+		$this->theme = $args['theme'];
+
+		parent::__construct($args);
+	}
+
+	function after() {
+
+		$update_actions = array();
+		if ( !empty($this->upgrader->result['destination_name']) &&
+			($theme_info = $this->upgrader->theme_info()) &&
+			!empty($theme_info) ) {
+
+			$name = $theme_info['Name'];
+			$stylesheet = $this->upgrader->result['destination_name'];
+			$template = !empty($theme_info['Template']) ? $theme_info['Template'] : $stylesheet;
+
+			$preview_link = htmlspecialchars( add_query_arg( array('preview' => 1, 'template' => $template, 'stylesheet' => $stylesheet, 'TB_iframe' => 'true' ), trailingslashit(esc_url(get_option('home'))) ) );
+			$activate_link = wp_nonce_url("themes.php?action=activate&amp;template=" . urlencode($template) . "&amp;stylesheet=" . urlencode($stylesheet), 'switch-theme_' . $template);
+
+			$update_actions['preview'] = '<a href="' . $preview_link . '" class="thickbox thickbox-preview" title="' . esc_attr(sprintf(__('Preview &#8220;%s&#8221;'), $name)) . '">' . __('Preview') . '</a>';
+			$update_actions['activate'] = '<a href="' . $activate_link .  '" class="activatelink" title="' . esc_attr( sprintf( __('Activate &#8220;%s&#8221;'), $name ) ) . '">' . __('Activate') . '</a>';
+
+			if ( ( ! $this->result || is_wp_error($this->result) ) || $stylesheet == get_stylesheet() )
+				unset($update_actions['preview'], $update_actions['activate']);
+		}
+
+		$update_actions['themes_page'] = '<a href="' . self_admin_url('themes.php') . '" title="' . esc_attr__('Return to Themes page') . '" target="_parent">' . __('Return to Themes page') . '</a>';
+        $update_actions['return'] = '<a href="' . admin_url('admin.php') . '?page=wp-appstore.php" title="' . esc_attr__('Return to WP AppStore') . '" target="_parent">' . __('Return to WP AppStore') . '</a>';
+		$update_actions = apply_filters('update_theme_complete_actions', $update_actions, $this->theme);
+		if ( ! empty($update_actions) )
+			$this->feedback(implode(' | ', (array)$update_actions));
+	}
+}
+
 if ( !function_exists('json_decode') ){
 function json_decode($json)
 {
@@ -361,7 +448,7 @@ class WP_AppStore{
             $current = get_site_transient( 'update_themes' );
         }
         foreach ($themes as $theme) {
-            $query = $wpdb->prepare("SELECT `version`, `link`, `homepage`, `title` FROM ".$wpdb->prefix."appstore_themes WHERE slug = %s", $theme['Stylesheet']);
+            $query = $wpdb->prepare("SELECT `version`, `link`, `homepage`, `title` FROM ".$wpdb->prefix."appstore_themes WHERE slug LIKE %s", $theme['Stylesheet']);
             $stored_themes_result = $wpdb->get_results($query);
             if ($stored_themes_result) {
                 $repo_ver = $this->str_to_float($stored_themes_result[0]->version);
@@ -372,20 +459,13 @@ class WP_AppStore{
                         $api['new_version'] = $stored_themes_result[0]->version;
                         $api['url'] = $stored_themes_result[0]->homepage;
                         $api['package'] = $stored_themes_result[0]->link;
-                    if (!isset($current->response[$theme['Stylesheet']])) {
-                        $current->response[$theme['Stylesheet']] = $api;
-                        $updated = 1;
-                    }
                 $for_update[$theme['Stylesheet']] = array('file' => $theme['Stylesheet'], 'object' => $api, 'title' => $stored_themes_result[0]->title);
                 }
             }
         }
         update_option('wp_appstore_themes_for_update', $for_update);
-        if ($updated) {
-            $current->last_checked = time();
-            set_site_transient('update_themes', $current);
-        }
     }
+    
     function check_for_plugins_updates(){
         global $wpdb;
         
@@ -398,7 +478,14 @@ class WP_AppStore{
         }
         
         foreach ($plugins as $key => $value) {
-            $query = $wpdb->prepare("SELECT `version`, `slug`, `id`, `link`, `homepage`, `title` FROM ".$wpdb->prefix."appstore_plugins WHERE title LIKE %s", '%'.$value['Name'].'%');
+            $exploded_path = explode('/', $key);
+            if(preg_match('|\.php$|', $exploded_path[0])){
+                $ext = strrchr($exploded_path[0], '.'); 
+                
+                if($ext !== false) 
+                    $exploded_path[0] = substr($exploded_path[0], 0, -strlen($ext));
+            }
+            $query = $wpdb->prepare("SELECT `title`, `version`, `slug`, `id`, `link`, `homepage`, `title` FROM ".$wpdb->prefix."appstore_plugins WHERE slug LIKE %s", $exploded_path[0]);
             $stored_plugins_result = $wpdb->get_results($query);
             if ($stored_plugins_result) {
                 $repo_ver = $this->str_to_float($stored_plugins_result[0]->version);
@@ -410,19 +497,11 @@ class WP_AppStore{
                         $api->new_version = $stored_plugins_result[0]->version;
                         $api->url = $stored_plugins_result[0]->homepage;
                         $api->package = $stored_plugins_result[0]->link;
-                    if (!isset($current->response[$key])) {
-                        $current->response[$key] = $api;
-                        $updated = 1;
-                    }
                 $for_update[$stored_plugins_result[0]->slug] = array('file' => $key, 'object' => $api, 'title' => $stored_plugins_result[0]->title);
                 }
             }
         }
         update_option('wp_appstore_plugins_for_update', $for_update);
-        if ($updated) {
-            $current->last_checked = time();
-            set_site_transient('update_plugins', $current);
-        }
     }
     
     function convert_escaped_quotes($str){
