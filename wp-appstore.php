@@ -34,7 +34,6 @@ function wp_appstore_page_store(){
     
     $latest_plugins = $appstore->get_lastest('plugin');
     $latest_themes = $appstore->get_lastest('theme');
-    
     $updates = get_option('wp_appstore_plugins_for_update', array());
     $stats = $appstore->get_stats();
 //wp_appstore_prepare_package('https://github.com/sproshkin/test/zipball/master', 'bb-dolly');
@@ -1351,6 +1350,26 @@ function wp_appstore_update_formulas() {
     update_option('wp_appstore_formulas_rescan', true);
     update_option('wp_appstore_last_lib_update', time());
 }
+function file_write($filename, &$content) {
+        if (!is_writable($filename)) {
+            if (!chmod($filename, 0666)) {
+                 echo "Cannot change the mode of file ($filename)";
+                 exit;
+            };
+        }
+        if (!$fp = @fopen($filename, "w")) {
+            echo "Cannot open file ($filename)";
+            exit;
+        }
+        if (fwrite($fp, $content) === FALSE) {
+            echo "Cannot write to file ($filename)";
+            exit;
+        }
+        if (!fclose($fp)) {
+            echo "Cannot close file ($filename)";
+            exit;
+        }
+    } 
 function wp_appstore_get_plugin_string_for_update($plugin_slug){
     if(!$plugin_slug)
         return false;
