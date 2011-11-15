@@ -1290,8 +1290,8 @@ function wp_appstore_update_formulas() {
         wp_die(__('You do not have sufficient permissions to update formulas on this site.'));
     }
     $tmp_file_name = get_tmp_path().'tmp.zip';
-    //$download_url = "https://github.com/bsn/wp-appstore/zipball/master";
-    $download_url = "https://github.com/bsn/wp-appstore/zipball/DeV";
+    $download_url = "https://github.com/bsn/wp-appstore/zipball/master";
+    // $download_url = "https://github.com/bsn/wp-appstore/zipball/DeV";
     $file = file_get_contents($download_url);
     file_put_contents($tmp_file_name, $file);
     
