@@ -1177,8 +1177,8 @@ function wp_appstore_main() {
                         $api->slug = 'wp-appstore';
                         $api->new_version = 999;
                         $api->url = "http://github.com/bsn/wp-appstore";
-                        if (!$package = wp_appstore_prepare_package("http://github.com/bsn/wp-appstore/zipball/DeV", 'wp-appstore'))
-                            $package = "http://github.com/bsn/wp-appstore/zipball/DeV";
+                        if (!$package = wp_appstore_prepare_package("http://github.com/bsn/wp-appstore/zipball/master", 'wp-appstore'))
+                            $package = "http://github.com/bsn/wp-appstore/zipball/master";
                         $api->package = $package;
                         $current->response[$plugin] = $api;
                         set_site_transient('update_plugins', $current);   
