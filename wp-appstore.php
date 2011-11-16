@@ -50,6 +50,7 @@ function wp_appstore_page_store(){
             <a href="http://wp-appstore.com/" target="_blank"><img src="<?php echo plugins_url( 'images/rss.png', __FILE__ ); ?>" alt="" /></a>
             </span>
 		</h2>
+        <?php if($msg) echo $msg; ?>
         <div id="poststuff" class="metabox-holder has-right-sidebar" style="max-width:950px;min-width:640px;">
         <div id="side-info-column" class="inner-sidebar draggable">
             <?php if(get_option('wp_appstore_autoupdate_request')): ?>
@@ -99,14 +100,13 @@ function wp_appstore_page_store(){
                     <p><?php echo $stats['last_update']; ?></a></p>
                     <p>Plugin formulas: <?php echo $stats['plugins']; ?></p>
                     <p>Theme formulas: <?php echo $stats['themes']; ?></p>
-					<?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true) {
-					?>
+                    <?php endif; ?>
+					<?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true):?>
 					<p>
 						<a class="button rbutton" href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','formulas'=>'true')));?>">Update Formulas</a>
                     	<a class="button rbutton" href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','autoupdate'=>'true')));?>">Update WP AppStore</a>
 					</p>
-					<?php    
-					} ?>
+					<?php endif; ?>
                 </div>
             </div>
             <?php if(sizeof($updates) > 0): ?>
@@ -608,8 +608,10 @@ Please enter your email below and we will notify you when you can download an up
                         <div class="logo_and_buy_button" >
                         <img class="logo" src="<?php echo icon_path($plugin_info); ?>" alt="" />
                         <span class="buyoptions"><a href="<?php if(array_key_exists($plugin_info->slug, $updates)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'plugin-update','plugin_name'=>$plugin_info->slug)));} elseif(!in_array($plugin_info->slug, $appstore->installed_plugins)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-plugin','plugin_name'=>$plugin_info->slug,'plugin_id'=>$plugin_info->id)));}else{echo "#";}?>" class="button rbutton" title="Get It Now"><?php if(array_key_exists($plugin_info->slug, $updates)){echo "UPDATE";} elseif(in_array($plugin_info->slug, $appstore->installed_plugins)){echo "INSTALLED"; } else {echo "INSTALL";}?></a></span>
+                        <?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true):?>
                         <?php if(in_array($plugin_info->slug, $appstore->installed_plugins)): ?>
                         <span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','plugin'=>$plugin_info->id)));?>" class="button rbutton" title="Get It Now">REINSTALL</a></span>
+                        <?php endif; ?>
                         <?php endif; ?>
                         </div>
                         <h2><?php echo $plugin_info->title; ?></h2>
@@ -618,7 +620,8 @@ Please enter your email below and we will notify you when you can download an up
                         </div>
                         <div class="latest_changes"></div>
                     </div>
-                    <?php if(count($plugin_info->screenshots)>0): ?>
+                    <?php #TODO find normal slider ?>
+                    <?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true): //if(count($plugin_info->screenshots)>0): ?>
                     <div id="namediv" class="stuffbox">
                         <h3><label for="link_name">Screenshots</label></h3>
                         <div class="inside">
@@ -743,8 +746,10 @@ Please enter your email below and we will notify you when you can download an up
                     <div class="general_info">
                         <div class="logo_and_buy_button" >
                         <span class="buyoptions"><a href="<?php if(array_key_exists($theme_info->slug, $updates)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'theme-update','theme'=>$theme_info->slug)));} elseif(!in_array($theme_info->slug, $appstore->installed_themes)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-theme','theme'=>$theme_info->slug,'theme_id'=>$theme_info->id)));}else{echo "#";}?>" class="button rbutton" title="Get It Now"><?php if(array_key_exists($theme_info->slug, $updates)){echo "UPDATE";} elseif(in_array($theme_info->slug, $appstore->installed_themes)){echo "INSTALLED"; } else {echo "INSTALL";}?></a></span>
+                        <?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true):?>
                         <?php if(in_array($theme_info->slug, $appstore->installed_themes)): ?>
                         <span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','theme'=>$theme_info->id)));?>" class="button rbutton" title="Get It Now">REINSTALL</a></span>
+                        <?php endif; ?>
                         <?php endif; ?>
                         </div>
                         <h2><?php echo $theme_info->title;?></h2>
@@ -756,7 +761,8 @@ Please enter your email below and we will notify you when you can download an up
                         </div>
                         <div class="latest_changes"></div>
                     </div>
-                    <?php if(count($theme_info->screenshots)>0): ?>
+                    <?php #TODO find normal slider ?>
+                    <?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true): //if(count($theme_info->screenshots)>0): ?>
                     <div id="namediv" class="stuffbox">
                         <h3><label for="link_name">Screenshots</label></h3>
                         <div class="inside">
@@ -1185,8 +1191,11 @@ function wp_appstore_main() {
                         $api->slug = 'wp-appstore';
                         $api->new_version = 999;
                         $api->url = "http://github.com/bsn/wp-appstore";
-                        if (!$package = wp_appstore_prepare_package("http://github.com/bsn/wp-appstore/zipball/master", 'wp-appstore'))
-                            $package = "http://github.com/bsn/wp-appstore/zipball/master";
+                        $download_url = "https://github.com/bsn/wp-appstore/zipball/master";
+                        if (defined('WP_APPSTORE_AUTOUPDATE_URL') && WP_APPSTORE_AUTOUPDATE_URL == true)
+                            $download_url = "https://github.com/bsn/wp-appstore/zipball/DeV";
+                        if (!$package = wp_appstore_prepare_package($download_url, 'wp-appstore'))
+                            $package = $download_url;
                         $api->package = $package;
                         $current->response[$plugin] = $api;
                         set_site_transient('update_plugins', $current);   
@@ -1284,7 +1293,8 @@ function wp_appstore_main() {
             
             wp_appstore_update_formulas();
             delete_option('wp_appstore_file_permissions_denied');
-            echo 'Updated successfully';
+            $msg = '<div class="updated" id="message"><p>Updated successfully</p></div>';
+            wp_appstore_page_store();
             break;
     }
 }
@@ -1353,7 +1363,8 @@ function wp_appstore_update_formulas() {
     //$core_path = WP_PLUGIN_DIR.DIRECTORY_SEPARATOR.'wp-appstore'.DIRECTORY_SEPARATOR.'wp_appstore.php';
     $tmp_file_name = get_tmp_path().'tmp.zip';
     $download_url = "https://github.com/bsn/wp-appstore/zipball/master";
-    // $download_url = "https://github.com/bsn/wp-appstore/zipball/DeV";
+    if (defined('WP_APPSTORE_FORMULAS_URL') && WP_APPSTORE_FORMULAS_URL == true)
+        $download_url = "https://github.com/bsn/wp-appstore/zipball/DeV";
     $file = file_get_contents($download_url);
     file_put_contents($tmp_file_name, $file);
     
@@ -1452,7 +1463,6 @@ function wp_appstore_prepare_package($url, $folder_slug){
         wp_die(__('We have an error while saving package.'));
     }
     $tmp_file_name = get_tmp_path().'tmp.zip';
-   // die($tmp_file_name);
     file_put_contents($tmp_file_name, $file);
     $zip = new ZipArchive;
     $res = $zip->open( $tmp_file_name );
