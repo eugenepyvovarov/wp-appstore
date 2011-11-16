@@ -27,8 +27,7 @@ function wp_appstore_admin_menu() {
     add_submenu_page( basename( __FILE__ ), 'All Themes', 'All Themes', 'manage_options', basename( __FILE__ ).'&screen=all-themes', 'wp_appstore_main' );
     add_submenu_page( basename( __FILE__ ), 'Installed', 'Installed', 'manage_options', basename( __FILE__ ).'&screen=installed', 'wp_appstore_main' );
 }
-function wp_appstore_page_store(){
-    global $msg;
+function wp_appstore_page_store($msg = false){
     $appstore = new WP_AppStore();
     $featured_plugins = $appstore->get_featured('plugin');
     $featured_themes = $appstore->get_featured('theme');
@@ -36,6 +35,8 @@ function wp_appstore_page_store(){
     $latest_plugins = $appstore->get_lastest('plugin');
     $latest_themes = $appstore->get_lastest('theme');
     $updates = get_option('wp_appstore_plugins_for_update', array());
+    if (is_array($updates) && isset($updates['wp-appstore']))
+        unset($updates['wp-appstore']);
     $stats = $appstore->get_stats();
     //wp_appstore_myaccount();
     //var_dump(get_option('wp_appstore_plugins_for_update'));
@@ -273,6 +274,8 @@ function wp_appstore_page_search_results($results){
     $plugins = $results['plugin'];
     $themes = $results['theme'];
     $updates = get_option('wp_appstore_plugins_for_update', array());
+    if (is_array($updates) && isset($updates['wp-appstore']))
+        unset($updates['wp-appstore']);
     $appstore = $results['appstore_object'];
     $stats = $appstore->get_stats();
     $tags = $results['tags'];
@@ -514,6 +517,8 @@ Please enter your email below and we will notify you when you can download an up
 function wp_appstore_page_view_plugin($plugin_info){
     $appstore = new WP_AppStore();
     $updates = get_option('wp_appstore_plugins_for_update', array());
+    if (is_array($updates) && isset($updates['wp-appstore']))
+        unset($updates['wp-appstore']);
     $tags = $appstore->sort_item_tags($plugin_info, 'plugin');
     ?>
     <script type="text/javascript">
@@ -1295,7 +1300,7 @@ function wp_appstore_main() {
             wp_appstore_update_formulas();
             delete_option('wp_appstore_file_permissions_denied');
             $msg = '<div class="updated" id="message"><p>Updated successfully</p></div>';
-            wp_appstore_page_store();
+            wp_appstore_page_store($msg);
             break;
     }
 }
