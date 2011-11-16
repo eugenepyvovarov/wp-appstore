@@ -97,13 +97,6 @@ function wp_appstore_page_store(){
                     <p><span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-formulas-update')));?>" class="button rbutton" title="Update It Now">Get Update Now!</a></span></p>
                     <?php else: ?>
                     <p><?php echo $stats['last_update']; ?></a></p>
-<<<<<<< HEAD
-                    <p>Plugins formulas in database: <?php echo $stats['plugins']; ?></p>
-                    <p>Themes formulas in database: <?php echo $stats['themes']; ?></p>
-                    <?php endif; ?>
-                    <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-formulas-update')));?>" title="View Plugin Page">Reinstall Formulas</a>
-                    <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','autoupdate'=>'true')));?>" title="View Plugin Page">Appstore autoupdate try</a>
-=======
                     <p>Plugin formulas: <?php echo $stats['plugins']; ?></p>
                     <p>Theme formulas: <?php echo $stats['themes']; ?></p>
 					<?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true) {
@@ -114,8 +107,6 @@ function wp_appstore_page_store(){
 					</p>
 					<?php    
 					} ?>
-                    
->>>>>>> master
                 </div>
             </div>
             <?php if(sizeof($updates) > 0): ?>
