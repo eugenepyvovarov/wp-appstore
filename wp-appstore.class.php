@@ -376,7 +376,6 @@ function json_encode( $data ) {
 }
 }
 class WP_AppStore{
-    public $http;
     public $installed_plugins;
     public $installed_themes;
     public $ini_files;
@@ -384,7 +383,6 @@ class WP_AppStore{
     public $dir;
     
     function WP_AppStore(){
-        $this->http = new WP_Http();
         $this->installed_plugins = $this->get_installed_plugins();
         $this->get_installed_themes();
         $this->set_formulas();
@@ -398,7 +396,7 @@ class WP_AppStore{
             $this->store();
             $this->check_for_plugins_updates();
             $this->check_for_themes_updates();
-        }
+       }
     }
     function get_installed_plugins() {
     	$dir = WP_PLUGIN_DIR;
@@ -670,6 +668,7 @@ class WP_AppStore{
                         if (($tm['type'] == 'theme') && (isset($stored_themes[$tm['slug']]))) {
                             $theme_id = $stored_themes[$tm['slug']];
                             unset($stored_themes[$tm['slug']]);
+                            unset($tm['type']);
                             $mold = array('title'=>'', 'slug'=>'', 'description'=>'', 'author'=>'', 'version'=>'', 'updated'=>'', 'category_slug'=>'', 'category_name'=>'', 'link'=>'', 'icon'=>'', 'preview_url'=>'', 'homepage'=>'', 'featured'=>'', 'rating'=>'', 'votes'=>'', 'downloaded'=>'', 'price'=>'');
                             $tm = array_merge($mold, $tm);
                                 $wpdb->update(
@@ -717,7 +716,6 @@ class WP_AppStore{
                                 $tm,  
                                 array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%d', '%d' )  
                             );
-
                             $plugin_id = $wpdb->insert_id;
                             $wpdb->flush(); 
                             if (is_array($screenshots)) {
@@ -746,6 +744,7 @@ class WP_AppStore{
                         if (($tm['type'] == 'plugin') && (isset($stored_plugins[$tm['slug']]))) {
                             $plugin_id = $stored_plugins[$tm['slug']];
                             unset($stored_plugins[$tm['slug']]);
+                            unset($tm['type']);
                             $mold = array('title'=>'', 'slug'=>'', 'description'=>'', 'author'=>'', 'version'=>'', 'updated'=>'', 'added'=>'', 'requires'=>'', 'tested'=>'', 'category_slug'=>'', 'category_name'=>'', 'link'=>'', 'icon'=>'', 'homepage'=>'', 'featured'=>'', 'rating'=>'', 'votes'=>'', 'downloaded'=>'', 'price'=>'');
                             $tm = array_merge($mold, $tm);
                                 $wpdb->update(
@@ -754,8 +753,7 @@ class WP_AppStore{
                                     array( 'id' => $plugin_id),  
                                     array( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%d', '%d', '%d' ),  
                                     array( '%d' )  
-                                );
-                                
+                                );   
                             if (is_array($screenshots)) {
                                 $query = $wpdb->prepare("DELETE FROM ".$wpdb->prefix."appstore_screenshots WHERE plugin_id=%d", $plugin_id);
                                 $wpdb->query($query);
@@ -815,7 +813,6 @@ class WP_AppStore{
             }
         update_option('wp_appstore_formulas_rescan', false);    
         }
-        return $dump;
     }
     
     function admin_url( $args = null ) {

@@ -36,12 +36,9 @@ function wp_appstore_page_store(){
     $latest_themes = $appstore->get_lastest('theme');
     $updates = get_option('wp_appstore_plugins_for_update', array());
     $stats = $appstore->get_stats();
-//wp_appstore_prepare_package('https://github.com/sproshkin/test/zipball/master', 'bb-dolly');
-    //$up = new WPAppstore_Plugin_Upgrader();
-    //var_dump($appstore->check_for_plugins_updates());
+    //wp_appstore_myaccount();
     //var_dump(get_option('wp_appstore_plugins_for_update'));
-    //var_dump(wp_appstore_get_plugin_string_for_update('bb'));
-    //wp_appstore_update_formulas();
+
     ?>
 
     <div class="wrap">
@@ -94,10 +91,15 @@ function wp_appstore_page_store(){
             <div id="" class="postbox " style="">
                 <h3 class="hndle"><span>WP Appstore stats</span></h3>
                 <div class="inside">
+                    <?php if (get_option('wp_appstore_file_permissions_denied')):?>
+                    <p>Automatic formulas update blocked on your site. Try to do it manually switching folder permissions to 0777 or let us try to do it</p>
+                    <p><span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-formulas-update')));?>" class="button rbutton" title="Update It Now">Get Update Now!</a></span></p>
+                    <?php else: ?>
                     <p><?php echo $stats['last_update']; ?></a></p>
                     <p>Plugins formulas in database: <?php echo $stats['plugins']; ?></p>
                     <p>Themes formulas in database: <?php echo $stats['themes']; ?></p>
-                    <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','formulas'=>'true')));?>" title="View Plugin Page">Reinstall Formulas</a>
+                    <?php endif; ?>
+                    <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-formulas-update')));?>" title="View Plugin Page">Reinstall Formulas</a>
                     <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','autoupdate'=>'true')));?>" title="View Plugin Page">Appstore autoupdate try</a>
                 </div>
             </div>
@@ -775,7 +777,7 @@ Please enter your email below and we will notify you when you can download an up
 }
 
 function wp_appstore_main() {
-    $pages = array('store', 'search', 'tag-filter', 'all-plugins', 'all-themes', 'view-plugin', 'view-theme', 'install-plugin', 'install-theme', 'autoupdate', 'plugin-update', 'theme-update', 'installed', 'featured-plugins', 'featured-themes', 'force-update');
+    $pages = array('store', 'search', 'tag-filter', 'all-plugins', 'all-themes', 'view-plugin', 'view-theme', 'install-plugin', 'install-theme', 'autoupdate', 'plugin-update', 'theme-update', 'installed', 'featured-plugins', 'featured-themes', 'force-formulas-update', 'force-update');
     $page = '';
     if(!isset($_GET['screen']) || !in_array($_GET['screen'],$pages)){
         $page = 'store';
@@ -1241,12 +1243,60 @@ function wp_appstore_main() {
                     $upgrader->upgrade($string);
             }
             if(isset($_GET['formulas'])){
-                wp_appstore_update_formulas();
+                update_option('wp_appstore_formulas_rescan', true);
                 $appstore = new WP_AppStore();
-                $appstore->set_formulas();
                 wp_appstore_page_store();
             }
             break;
+        case 'force-formulas-update':
+            /*if ( ! current_user_can('update_plugins') )
+    			wp_die(__('You do not have sufficient permissions to update plugins for this site.'));
+            if (!get_option('wp_appstore_file_permissions_denied'))
+                wp_appstore_page_store();*/
+            //check_admin_referer('upgrade-formulas');
+            global $wp_filesystem;
+            $url = 'admin.php?page=wp-appstore.php&screen=force-formulas-update';
+    		if ( false === ($credentials = wp_appstore_request_filesystem_credentials($url)) )
+                exit('Filesystem access fail!');
+                //return false;
+
+    		if ( ! WP_Filesystem($credentials) ) {
+    			$error = true;
+    			if ( is_object($wp_filesystem) && $wp_filesystem->errors->get_error_code() )
+    				$error = $wp_filesystem->errors;
+    			$this->skin->wp_appstore_request_filesystem_credentials($url, '', $error); //Failed to connect, Error and request again
+                exit('Filesystem access fail!');
+                //return false;
+    		}
+
+    		if ( ! is_object($wp_filesystem) )
+                exit('Filesystem access fail!');
+    
+    		if ( is_wp_error($wp_filesystem->errors) && $wp_filesystem->errors->get_error_code() )
+    			 exit('Filesystem access error:'.$wp_filesystem->errors);
+            
+            wp_appstore_update_formulas();
+            delete_option('wp_appstore_file_permissions_denied');
+            echo 'Updated successfully';
+            break;
+    }
+}
+function wp_appstore_request_filesystem_credentials($url, $type = '', $error = false, $context = false) {
+        if (!$context)
+            $context = WP_PLUGIN_DIR.DIRECTORY_SEPARATOR.'wp-appstore'.DIRECTORY_SEPARATOR.'formulas';
+        $nonce = 'upgrade-formulas';
+        $url = wp_nonce_url($url, $nonce);
+		return request_filesystem_credentials($url, '', $error, $context); //Possible to bring inline, Leaving as is for now.
+	}
+function wp_appstore_check_for_force_formulas_update() {
+    $path = WP_PLUGIN_DIR.DIRECTORY_SEPARATOR.'wp-appstore'.DIRECTORY_SEPARATOR.'formulas';
+    $files = scandir($path, 1);
+    if (is_writable($path.DIRECTORY_SEPARATOR.$files[0])){
+        delete_option('wp_appstore_file_permissions_denied');
+        return true;
+    }else{
+        update_option('wp_appstore_file_permissions_denied', true);
+        return false;
     }
 }
 function wp_appstore_myaccount() {
@@ -1285,9 +1335,15 @@ function get_tmp_path(){
 }
 
 function wp_appstore_update_formulas() {
+    global $wp_filesystem;
     if (!get_tmp_path()) {
         wp_die(__('You do not have sufficient permissions to update formulas on this site.'));
     }
+    if (!wp_appstore_check_for_force_formulas_update() && !is_object($wp_filesystem)) {
+        wp_die(__('You do not have sufficient permissions to update formulas on this site. Check your filesystem.'));
+    }
+
+    //$core_path = WP_PLUGIN_DIR.DIRECTORY_SEPARATOR.'wp-appstore'.DIRECTORY_SEPARATOR.'wp_appstore.php';
     $tmp_file_name = get_tmp_path().'tmp.zip';
     //$download_url = "https://github.com/bsn/wp-appstore/zipball/master";
     $download_url = "https://github.com/bsn/wp-appstore/zipball/DeV";
@@ -1295,6 +1351,8 @@ function wp_appstore_update_formulas() {
     file_put_contents($tmp_file_name, $file);
     
     $path = WP_PLUGIN_DIR.DIRECTORY_SEPARATOR.'wp-appstore'.DIRECTORY_SEPARATOR.'formulas';
+    if (is_object($wp_filesystem))
+        $path = $wp_filesystem->wp_plugins_dir().'wp-appstore'.DIRECTORY_SEPARATOR.'formulas';
     
     $wp_appstore_plugin = get_tmp_path().'wp_appstore_plg.php';
     
@@ -1335,6 +1393,13 @@ function wp_appstore_update_formulas() {
           
           if(preg_match('|\.ini$|', zip_entry_name($zip_entry))){
             $filename = strrchr(zip_entry_name($zip_entry),'/');
+            if (is_object($wp_filesystem)) {
+                $wp_filesystem->put_contents(
+                  $path.$filename,
+                  $buf,
+                  0777 // predefined mode settings for WP files
+                );
+            }else
             @file_put_contents($path.$filename,$buf);
           }
            
@@ -1350,26 +1415,7 @@ function wp_appstore_update_formulas() {
     update_option('wp_appstore_formulas_rescan', true);
     update_option('wp_appstore_last_lib_update', time());
 }
-function file_write($filename, &$content) {
-        if (!is_writable($filename)) {
-            if (!chmod($filename, 0666)) {
-                 echo "Cannot change the mode of file ($filename)";
-                 exit;
-            };
-        }
-        if (!$fp = @fopen($filename, "w")) {
-            echo "Cannot open file ($filename)";
-            exit;
-        }
-        if (fwrite($fp, $content) === FALSE) {
-            echo "Cannot write to file ($filename)";
-            exit;
-        }
-        if (!fclose($fp)) {
-            echo "Cannot close file ($filename)";
-            exit;
-        }
-    } 
+
 function wp_appstore_get_plugin_string_for_update($plugin_slug){
     if(!$plugin_slug)
         return false;
