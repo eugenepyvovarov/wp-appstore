@@ -4,7 +4,7 @@ Plugin Name: WP AppStore
 Plugin URI: http://wp-appstore.com
 Description: Premium plugins and themes
 Author: Lifeisgoodlabs   
-Version: 0.7.5
+Version: 1.0
 Author URI: http://www.wp-appstore.com
 */
 

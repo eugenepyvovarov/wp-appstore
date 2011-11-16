@@ -2,15 +2,16 @@
 Contributors: bsndev
 Tags: admin, plugin, theme, shop
 Requires at least: 2.8
-Tested up to: 3.1.2
-Stable tag: 0.7.1
+Tested up to: 3.2.1
+Stable tag: 1.0
 
 Download professional themes and plugins right from your WordPress admin area!
 
 == Description ==
 
-Download professional themes and plugins right from your WordPress admin area!
-Please contact me at eugene@wp-appstore.com if you want your plugin or theme to be listed too.
+Best plugins and themes in one click!
+Homebrew-like plugins and themes repository for Wordpress!
+Please submit your pull requests on our github page https://github.com/bsn/wp-appstore to add your plugins to repository.
 
 == Installation ==
 
@@ -18,6 +19,12 @@ Please contact me at eugene@wp-appstore.com if you want your plugin or theme to 
 2. Activate the plugin through the 'Plugins' menu in WordPress
 
 == Changelog ==
+
+= 1.0 =
+* all information about installation of plugins stored in formulas(files in a folder) - no usage of APIs
+* added featued plugins/themes
+* auto-update of wp-appstore from github
+* auto update formulas only from github
 
 = 0.7.1 =
 * fixed bug with updating plugins and WordPress core
