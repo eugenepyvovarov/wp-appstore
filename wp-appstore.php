@@ -28,6 +28,7 @@ function wp_appstore_admin_menu() {
     add_submenu_page( basename( __FILE__ ), 'Installed', 'Installed', 'manage_options', basename( __FILE__ ).'&screen=installed', 'wp_appstore_main' );
 }
 function wp_appstore_page_store(){
+    global $msg;
     $appstore = new WP_AppStore();
     $featured_plugins = $appstore->get_featured('plugin');
     $featured_themes = $appstore->get_featured('theme');
