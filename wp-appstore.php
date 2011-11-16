@@ -67,11 +67,12 @@ function wp_appstore_page_store(){
                 <h3 class="hndle"><span>WELCOME!</span></h3>
                 <div class="inside">
                     <p>Welcome to the first place where you can get professional plugins and the best themes.</p>
-                    <p>This store is just a preview of what's to come.  Please send feedback to <a href="mailto:eugene@lifeisgoodlabs.com">eugene@lifeisgoodlabs.com</a></p>
+                    <p>Please send feedback to <a href="mailto:eugene@lifeisgoodlabs.com">eugene@lifeisgoodlabs.com</a></p>
+                    <p><strong>Submit your plugins on <a href="https://github.com/bsn/wp-appstore" target="_blank">our github page</a>!</strong></p>
                 </div>
             </div> 
             <div id="" class="postbox " style="">
-                <h3 class="hndle"><span>Search!</span></h3>
+                <h3 class="hndle"><span>Search</span></h3>
                 <div class="inside">
                 <form method="get" enctype="text/plain" action="">
                 <input type="hidden" value="wp-appstore.php" name="page" />
@@ -96,11 +97,25 @@ function wp_appstore_page_store(){
                     <p><span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-formulas-update')));?>" class="button rbutton" title="Update It Now">Get Update Now!</a></span></p>
                     <?php else: ?>
                     <p><?php echo $stats['last_update']; ?></a></p>
+<<<<<<< HEAD
                     <p>Plugins formulas in database: <?php echo $stats['plugins']; ?></p>
                     <p>Themes formulas in database: <?php echo $stats['themes']; ?></p>
                     <?php endif; ?>
                     <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-formulas-update')));?>" title="View Plugin Page">Reinstall Formulas</a>
                     <a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','autoupdate'=>'true')));?>" title="View Plugin Page">Appstore autoupdate try</a>
+=======
+                    <p>Plugin formulas: <?php echo $stats['plugins']; ?></p>
+                    <p>Theme formulas: <?php echo $stats['themes']; ?></p>
+					<?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true) {
+					?>
+					<p>
+						<a class="button rbutton" href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','formulas'=>'true')));?>">Update Formulas</a>
+                    	<a class="button rbutton" href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','autoupdate'=>'true')));?>">Update WP AppStore</a>
+					</p>
+					<?php    
+					} ?>
+                    
+>>>>>>> master
                 </div>
             </div>
             <?php if(sizeof($updates) > 0): ?>
@@ -296,12 +311,13 @@ function wp_appstore_page_search_results($results){
             <div id="" class="postbox " style="">
                 <h3 class="hndle"><span>WELCOME!</span></h3>
                 <div class="inside">
-                    <p>Welcome to the first place where you can get professional plugins and the best themes.</p>
-                    <p>This store is just a preview of what's to come.  Please send feedback to <a href="mailto:eugene@lifeisgoodlabs.com">eugene@lifeisgoodlabs.com</a></p>
-                </div>
+					<p>Welcome to the first place where you can get professional plugins and the best themes.</p>
+                    <p>Please send feedback to <a href="mailto:eugene@lifeisgoodlabs.com">eugene@lifeisgoodlabs.com</a></p>
+                    <p><strong>Submit your plugins on <a href="https://github.com/bsn/wp-appstore" target="_blank">our github page</a>!</strong></p>                
+				</div>
             </div> 
             <div id="" class="postbox " style="">
-                <h3 class="hndle"><span>Search!</span></h3>
+                <h3 class="hndle"><span>Search</span></h3>
                 <div class="inside">
                 <form method="get" enctype="text/plain" action="">
                 <input type="hidden" value="wp-appstore.php" name="page" />
@@ -1178,8 +1194,8 @@ function wp_appstore_main() {
                         $api->slug = 'wp-appstore';
                         $api->new_version = 999;
                         $api->url = "http://github.com/bsn/wp-appstore";
-                        if (!$package = wp_appstore_prepare_package("http://github.com/bsn/wp-appstore/zipball/DeV", 'wp-appstore'))
-                            $package = "http://github.com/bsn/wp-appstore/zipball/DeV";
+                        if (!$package = wp_appstore_prepare_package("http://github.com/bsn/wp-appstore/zipball/master", 'wp-appstore'))
+                            $package = "http://github.com/bsn/wp-appstore/zipball/master";
                         $api->package = $package;
                         $current->response[$plugin] = $api;
                         set_site_transient('update_plugins', $current);   
@@ -1345,8 +1361,8 @@ function wp_appstore_update_formulas() {
 
     //$core_path = WP_PLUGIN_DIR.DIRECTORY_SEPARATOR.'wp-appstore'.DIRECTORY_SEPARATOR.'wp_appstore.php';
     $tmp_file_name = get_tmp_path().'tmp.zip';
-    //$download_url = "https://github.com/bsn/wp-appstore/zipball/master";
-    $download_url = "https://github.com/bsn/wp-appstore/zipball/DeV";
+    $download_url = "https://github.com/bsn/wp-appstore/zipball/master";
+    // $download_url = "https://github.com/bsn/wp-appstore/zipball/DeV";
     $file = file_get_contents($download_url);
     file_put_contents($tmp_file_name, $file);
     
