@@ -1034,18 +1034,17 @@ function wp_appstore_main() {
                         wp_update_plugins();
                     }
                     $for_update = get_option('wp_appstore_plugins_for_update');
-                    if (!$plugin = $for_update[$plugin_slug]['file']) {
+                    if (isset($for_update[$plugin_slug]['file'])) {
                         if (!isset($current->response[$plugin])) {
-                          wp_die(__('Error occured while update of this plugin.'));  
-                        }
-                    }else{
-                        if (!isset($current->response[$plugin])) {
-                            if ($package = wp_appstore_prepare_package($for_update[$plugin_slug]['object']->link, $for_update[$plugin_slug]['object']->slug))
-                                $for_update[$plugin_slug]['object']->link = $package;
-                            
+                            if ($package = wp_appstore_prepare_package($for_update[$plugin_slug]['object']->package, $for_update[$plugin_slug]['object']->slug))
+                                $for_update[$plugin_slug]['object']->package = $package;
                             $current->response[$plugin] = $for_update[$plugin_slug]['object'];
                             set_site_transient('update_plugins', $current);
                         }
+                    }
+                    if (!isset($for_update[$plugin_slug]['file']) &&  !isset($current->response[$plugin])) {
+                        delete_option('wp_appstore_autoupdate_request');
+                        wp_appstore_page_store();
                     }
             		$title = sprintf( __('Update Plugin: %s'), 'WP Appstore');
                     
@@ -1055,9 +1054,12 @@ function wp_appstore_main() {
             		$nonce = 'upgrade-plugin_' . $plugin;
                     $url = 'admin.php?page=wp-appstore.php&screen=autoupdate';
             		$upgrader = new Plugin_Upgrader( new WPAppstore_Plugin_Upgrader_Skin( compact('title', 'nonce', 'url', 'plugin') ) );
-            		$upgrader->upgrade($plugin);
-                    unset($for_update[$plugin_slug]);
-                    update_option('wp_appstore_plugins_for_update', $for_update);
+            		$result = $upgrader->upgrade($plugin);
+                    if ($result !== false && !is_wp_error($result)) {
+                        unset($for_update[$plugin_slug]);
+                        update_option('wp_appstore_plugins_for_update', $for_update);
+                        delete_option('wp_appstore_autoupdate_request');
+                    }
             }
             break;
         case 'plugin-update':
@@ -1271,10 +1273,10 @@ function wp_appstore_main() {
             }
             break;
         case 'force-formulas-update':
-            /*if ( ! current_user_can('update_plugins') )
+            if ( ! current_user_can('update_plugins') )
     			wp_die(__('You do not have sufficient permissions to update plugins for this site.'));
             if (!get_option('wp_appstore_file_permissions_denied'))
-                wp_appstore_page_store();*/
+                wp_appstore_page_store();
             //check_admin_referer('upgrade-formulas');
             global $wp_filesystem;
             $url = 'admin.php?page=wp-appstore.php&screen=force-formulas-update';
@@ -1353,7 +1355,8 @@ function get_tmp_path(){
 			return $temp;
 	}
 	$temp = '/tmp/';
-	return $temp;
+    if ( is_dir($temp) && @is_writable($temp) )
+	   return $temp;
     return false;
 }
 
@@ -1463,10 +1466,10 @@ function wp_appstore_get_plugin_string_for_update($plugin_slug){
 }
 function wp_appstore_prepare_package($url, $folder_slug){
     if (!$file = file_get_contents($url)) {
-        wp_die(__('We have an error while downloading package.'));
+        return false;
     }
     if (!get_tmp_path()) {
-        wp_die(__('We have an error while saving package.'));
+        return false;
     }
     $tmp_file_name = get_tmp_path().'tmp.zip';
     file_put_contents($tmp_file_name, $file);
@@ -1489,7 +1492,6 @@ function wp_appstore_prepare_package($url, $folder_slug){
         $zip->close();
         return $tmp_file_name;
     } else {
-        echo 'failed, code:' . $res;
         return false;
     }
 }

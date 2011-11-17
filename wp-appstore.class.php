@@ -595,8 +595,7 @@ class WP_AppStore{
             
             $this->formulas['theme'][$tmp['id']] = (object)$tmp;
             unset($screenshots, $tags, $ss, $tag);
-        }
-        return $out;  
+        } 
     }
 //set formulas to db    
     function store(){
@@ -900,6 +899,7 @@ class WP_AppStore{
         if (($type != 'plugin') && ($type != 'theme')) {
             return false;
         }
+        $sql_limit = '';
         if($limit)
             $sql_limit = ' LIMIT 0 , '.$limit;
         global $wpdb;
