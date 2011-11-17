@@ -1399,18 +1399,6 @@ function wp_appstore_update_formulas() {
                 $repo_ver = WP_AppStore::str_to_float($repo_plugin_headers['Version']);
                 $site_ver = WP_AppStore::str_to_float($site_plugin_headers['Version']);
                 if ($repo_ver > $site_ver) {
-                    $api = new StdClass;
-                    $api->id = 1;
-                    $api->slug = 'wp-appstore';
-                    $api->new_version = $repo_plugin_headers['Version'];
-                    $api->url = $repo_plugin_headers['PluginURI'];
-                    $api->package = $download_url;
-                    
-                   
-                    $current = get_site_transient( 'update_plugins' );
-                    $current->response['wp-appstore/wp-appstore.php'] = $api;
-                    $current->last_checked = time();
-                    set_site_transient('update_plugins', $current);  //whether to actually check for updates, so we reset it to zero.
                     $for_update['wp-appstore'] = array('file' => 'wp-appstore/wp-appstore.php', 'object' => $api);
                     update_option('wp_appstore_plugins_for_update', $for_update);
                     update_option('wp_appstore_autoupdate_request', true);
