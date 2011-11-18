@@ -12,13 +12,14 @@ Author URI: http://www.wp-appstore.com
 if ( ! class_exists('WP_Upgrader') )
  include_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
  include_once 'wp-appstore.class.php';
-
+ include_once WP_PLUGIN_DIR."/wp-appstore/tools/updater.php";
+ 
 function wp_appstore_admin_init() {
     wp_enqueue_style( 'wp-appstore-css', plugins_url( basename( dirname( __FILE__ ) ) . '/wp-appstore.css' ), false, '20110322' );
-    wp_enqueue_style( 'wp-appstore-slider', plugins_url( basename( dirname( __FILE__ ) ) . '/nivo-slider/nivo-slider.css' ), false, '20110322' );
-    wp_enqueue_style( 'wp-appstore-slider1', plugins_url( basename( dirname( __FILE__ ) ) . '/nivo-slider/demo/style.css' ), false, '20110322' );
+    wp_enqueue_style( 'wp-appstore-slider', plugins_url( basename( dirname( __FILE__ ) ) . '/assets/scrollable-horizontal.css' ), false, '20110322' );
+    wp_enqueue_style( 'wp-appstore-slider-buttons', plugins_url( basename( dirname( __FILE__ ) ) . '/assets/scrollable-buttons.css' ), false, '20110322' );
     wp_enqueue_style( 'thickbox' );
-    wp_enqueue_script( 'wp-appstore-slider-js', plugins_url( basename( dirname( __FILE__ ) )  . '/nivo-slider/jquery.nivo.slider.js'), array( 'jquery'), '20110322' );
+    wp_enqueue_script( 'wp-appstore-slider-js', plugins_url( basename( dirname( __FILE__ ) )  . '/assets/jquery.tools.min.js'), array( 'jquery'), '20110322' );
     wp_enqueue_script('thickbox');
 }
 function wp_appstore_admin_menu() {
@@ -38,7 +39,6 @@ function wp_appstore_page_store($msg = false){
     if (is_array($updates) && isset($updates['wp-appstore']))
         unset($updates['wp-appstore']);
     $stats = $appstore->get_stats();
-    //wp_appstore_myaccount();
     //var_dump(get_option('wp_appstore_plugins_for_update'));
 
     ?>
@@ -626,26 +626,84 @@ Please enter your email below and we will notify you when you can download an up
                         </div>
                         <div class="latest_changes"></div>
                     </div>
-                    <?php #TODO find normal slider ?>
-                    <?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true): //if(count($plugin_info->screenshots)>0): ?>
-                    <div id="namediv" class="stuffbox">
-                        <h3><label for="link_name">Screenshots</label></h3>
-                        <div class="inside">
-                        <div id="slider" class="nivoSlider">
-                            <?php foreach($plugin_info->screenshots as $one): ?>
-                            <img src="<?php echo $one ?>" alt="" />
-                        <?php endforeach; ?>
-                        </div>
-                        <div id="htmlcaption" class="nivo-html-caption">
-                            <strong>This</strong> is an example of a <em>HTML</em> caption with <a href="#">a link</a>.
-                        </div>
-                        </div>
-                        <script type="text/javascript">
-                        jQuery(window).load(function() {
-                            jQuery('#nivo-slider').nivoSlider({effect:'sliceDownRight',animSpeed:500, pauseTime:7500});
-                        });
-                        </script>
+                    <?php if(count($plugin_info->screenshots)>0): ?>
+                    <!-- slider -->
+                    <!-- wrapper element for the large image -->
+                    <div id="image_wrap">
+                    
+                    	<!-- Initially the image is a simple 1x1 pixel transparent GIF -->
+                    	<img src="<?php echo plugins_url( 'assets/img/blank.gif', __FILE__ ); ?>" height="375" />
+                    
                     </div>
+
+
+                    <!-- "previous page" action -->
+                    <a class="prev browse left"></a>
+                    
+                    <!-- root element for scrollable -->
+                    <div class="scrollable">   
+                       
+                       <!-- root element for the items -->
+                       <div class="items">
+                          <div>
+                          <?php for ($i=1;$i <= count($plugin_info->screenshots); $i++): ?>
+                            <?php if(!($i % 5)) echo '</div><div>'; ?>
+                            <?php echo '<img src="'.$plugin_info->screenshots[$i-1].'" />' ?>
+                          <?php endfor; ?>
+                          </div>  
+                       </div>
+                       
+                    </div>
+
+                    <!-- "next page" action -->
+                    <a class="next browse right"></a>
+                    <script>
+                    // execute your scripts when the DOM is ready. this is mostly a good habit
+                    jQuery(document).ready(function($) {
+                    
+                    	// initialize scrollable
+                    	$(".scrollable").scrollable();
+                        $(".items img").click(function() {
+                    
+                    	// see if same thumb is being clicked
+                    	if ($(this).hasClass("active")) { return; }
+                    
+                    	// calclulate large image's URL based on the thumbnail URL (flickr specific)
+                    	var url = $(this).attr("src")//.replace("_t", "");
+                    
+                    	// get handle to element that wraps the image and make it semi-transparent
+                    	var wrap = $("#image_wrap").fadeTo("medium", 0.5);
+                    
+                    	// the large image from www.flickr.com
+                    	var img = new Image();
+                    
+                    
+                    	// call this function after it's loaded
+                    	img.onload = function() {
+                    
+                    		// make wrapper fully visible
+                    		wrap.fadeTo("fast", 1);
+                    
+                    		// change the image
+                    		wrap.find("img").attr("src", url);
+                    
+                    	};
+                    
+                    	// begin loading the image from www.flickr.com
+                    	img.src = url;
+                    
+                    	// activate item
+                    	$(".items img").removeClass("active");
+                    	$(this).addClass("active");
+                    
+                    // when page loads simulate a "click" on the first image
+                    }).filter(":first").click();
+                    
+                    });
+                    </script>
+
+
+                    <!-- endof slider -->
                     <?php endif; ?>
                 </div>
             </div>
@@ -767,26 +825,84 @@ Please enter your email below and we will notify you when you can download an up
                         </div>
                         <div class="latest_changes"></div>
                     </div>
-                    <?php #TODO find normal slider ?>
-                    <?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true): //if(count($theme_info->screenshots)>0): ?>
-                    <div id="namediv" class="stuffbox">
-                        <h3><label for="link_name">Screenshots</label></h3>
-                        <div class="inside">
-                        <div id="nivo-slider" class="nivoSlider">
-                            <?php foreach($theme_info->screenshots as $one): ?>
-                            <img src="<?php echo $one ?>" alt="" />
-                        <?php endforeach; ?>
-                        </div>
-                        <div id="htmlcaption" class="nivo-html-caption">
-                            <strong>This</strong> is an example of a <em>HTML</em> caption with <a href="#">a link</a>.
-                        </div>
-                        </div>
-                        <script type="text/javascript">
-                        jQuery(window).load(function() {
-                            jQuery('#nivo-slider').nivoSlider({effect:'sliceDownRight',animSpeed:500, pauseTime:7500});
-                        });
-                        </script>
+                    <?php if(count($theme_info->screenshots)>0): ?>
+                    <!-- slider -->
+                    <!-- wrapper element for the large image -->
+                    <div id="image_wrap">
+                    
+                    	<!-- Initially the image is a simple 1x1 pixel transparent GIF -->
+                    	<img src="<?php echo plugins_url( 'assets/img/blank.gif', __FILE__ ); ?>" height="375" />
+                    
                     </div>
+
+
+                    <!-- "previous page" action -->
+                    <a class="prev browse left"></a>
+                    
+                    <!-- root element for scrollable -->
+                    <div class="scrollable">   
+                       
+                       <!-- root element for the items -->
+                       <div class="items">
+                          <div>
+                          <?php for ($i=1;$i <= count($theme_info->screenshots); $i++): ?>
+                            <?php if(!($i % 5)) echo '</div><div>'; ?>
+                            <?php echo '<img src="'.$theme_info->screenshots[$i-1].'" />' ?>
+                          <?php endfor; ?>
+                          </div>  
+                       </div>
+                       
+                    </div>
+
+                    <!-- "next page" action -->
+                    <a class="next browse right"></a>
+                    <script>
+                    // execute your scripts when the DOM is ready. this is mostly a good habit
+                    jQuery(document).ready(function($) {
+                    
+                    	// initialize scrollable
+                    	$(".scrollable").scrollable();
+                        $(".items img").click(function() {
+                    
+                    	// see if same thumb is being clicked
+                    	if ($(this).hasClass("active")) { return; }
+                    
+                    	// calclulate large image's URL based on the thumbnail URL (flickr specific)
+                    	var url = $(this).attr("src")//.replace("_t", "");
+                    
+                    	// get handle to element that wraps the image and make it semi-transparent
+                    	var wrap = $("#image_wrap").fadeTo("medium", 0.5);
+                    
+                    	// the large image from www.flickr.com
+                    	var img = new Image();
+                    
+                    
+                    	// call this function after it's loaded
+                    	img.onload = function() {
+                    
+                    		// make wrapper fully visible
+                    		wrap.fadeTo("fast", 1);
+                    
+                    		// change the image
+                    		wrap.find("img").attr("src", url);
+                    
+                    	};
+                    
+                    	// begin loading the image from www.flickr.com
+                    	img.src = url;
+                    
+                    	// activate item
+                    	$(".items img").removeClass("active");
+                    	$(this).addClass("active");
+                    
+                    // when page loads simulate a "click" on the first image
+                    }).filter(":first").click();
+                    
+                    });
+                    </script>
+
+
+                    <!-- endof slider -->
                     <?php endif; ?>
                 </div>
             </div>
@@ -1571,10 +1687,12 @@ function wp_appstore_activation() {
 }
 function wp_appstore_deactivation() {
 	wp_clear_scheduled_hook('wp_appstore_daily_event');
+    wp_clear_scheduled_hook('wp_appstore_twicedaily_event');
 }
 function wp_appstore_uninstall() {
     global $wpdb;
     wp_clear_scheduled_hook('wp_appstore_daily_event');
+    wp_clear_scheduled_hook('wp_appstore_twicedaily_event');
     $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'appstore_plugins');
     $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'appstore_plugins_tags');
     $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'appstore_screenshots');
