@@ -8,11 +8,16 @@ Version: 0.7.5
 Author URI: http://www.wp-appstore.com
 */
 
- require_once(ABSPATH . 'wp-admin/includes/plugin.php');
+
 if ( ! class_exists('WP_Upgrader') )
  include_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
- include_once 'wp-appstore.class.php';
- include_once WP_PLUGIN_DIR."/wp-appstore/tools/updater.php";
+ 
+include_once 'wp-appstore.class.php';
+if(file_exists(WP_PLUGIN_DIR."/wp-appstore/tools/config.php"))
+    include_once WP_PLUGIN_DIR."/wp-appstore/tools/config.php";
+if (! function_exists('get_plugin_data'))
+    require_once(ABSPATH . 'wp-admin/includes/plugin.php');
+
  
 function wp_appstore_admin_init() {
     wp_enqueue_style( 'wp-appstore-css', plugins_url( basename( dirname( __FILE__ ) ) . '/wp-appstore.css' ), false, '20110322' );
@@ -39,8 +44,7 @@ function wp_appstore_page_store($msg = false){
     if (is_array($updates) && isset($updates['wp-appstore']))
         unset($updates['wp-appstore']);
     $stats = $appstore->get_stats();
-    //var_dump(get_option('wp_appstore_plugins_for_update'));
-
+//wp_appstore_frontend();
     ?>
 
     <div class="wrap">
@@ -1441,7 +1445,7 @@ function wp_appstore_check_for_force_formulas_update() {
     }
 }
 function wp_appstore_myaccount() {
-   // echo "456"; 
+   var_dump(get_posts());
 }
 function icon_path($item_object){
     if (strlen($item_object->icon) < 5)
@@ -1477,6 +1481,9 @@ function get_tmp_path(){
 }
 
 function wp_appstore_update_formulas() {
+    @ini_set( 'max_execution_time', 360 );
+    @set_time_limit( 360 );
+    
     global $wp_filesystem;
     if (!get_tmp_path()) {
         wp_die(__('You do not have sufficient permissions to update formulas on this site.'));
@@ -1545,6 +1552,9 @@ function wp_appstore_update_formulas() {
     unlink($wp_appstore_plugin);
     update_option('wp_appstore_formulas_rescan', true);
     update_option('wp_appstore_last_lib_update', time());
+    if (function_exists('wp_appstore_frontend')) {
+        wp_appstore_frontend();
+    }
 }
 
 function wp_appstore_get_plugin_string_for_update($plugin_slug){

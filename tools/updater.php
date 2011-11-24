@@ -24,7 +24,6 @@ function wp_appstore_update_checker(){
     $error = '';
     $mail = '';
     $formulas_dir = @ opendir( $formulas_path );
-    $check = get_option('wp_appstore_fl');
 		if ( $formulas_dir ) {
 			while (($file = readdir( $formulas_dir ) ) !== false ) {
 				if ( substr($file, 0, 1) == '.' )
@@ -35,8 +34,6 @@ function wp_appstore_update_checker(){
                         $formula_ver = WP_AppStore::str_to_float($contents['general']['version']);
                         $plugin = plugins_api('plugin_information', array('slug' => $contents['general']['slug'] ));
                         $wp_api_ver = WP_AppStore::str_to_float($plugin->version);
-                        if( isset($check['plugin'][$plugin->slug]) && $check['plugin'][$plugin->slug] == $plugin->version )
-                            continue;
                         //var_dump($wp_api_ver);
                         if ($wp_api_ver > $formula_ver) {
                         //let's start update formula file
@@ -96,8 +93,6 @@ function wp_appstore_update_checker(){
                         $formula_ver = WP_AppStore::str_to_float($contents['general']['version']);
                         $theme = themes_api('theme_information', array('slug' => $contents['general']['slug'] ));
                         $wp_api_ver = WP_AppStore::str_to_float($theme->version);
-                        if( isset($check['theme'][$theme->slug]) && $check['theme'][$theme->slug] == $theme->version )
-                            continue;
                         //var_dump($wp_api_ver);
                         if ($wp_api_ver > $formula_ver) {
                         //let's start update formula file
@@ -172,12 +167,9 @@ function wp_appstore_update_checker(){
         
         if (sizeof($attach) > 0) {
             foreach ($attach as $file) {
-                unlink($file);
+                @unlink($file);
             }
         }
-        $plugin_log = array_merge($check['plugin'], $plugin_log);
-        $theme_log = array_merge($check['theme'], $theme_log);
-        update_option('wp_appstore_fl', array('plugin' => $plugin_log, 'theme' => $theme_log));
 }
 
 add_action('wp_appstore_twicedaily_event', 'wp_appstore_update_checker');
