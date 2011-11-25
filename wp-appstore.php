@@ -26,6 +26,8 @@ function wp_appstore_admin_init() {
     wp_enqueue_style( 'thickbox' );
     wp_enqueue_script( 'wp-appstore-slider-js', plugins_url( basename( dirname( __FILE__ ) )  . '/assets/jquery.tools.min.js'), array( 'jquery'), '20110322' );
     wp_enqueue_script('thickbox');
+    if(get_option('wp_appstore_frontend_rescan') && function_exists('wp_appstore_frontend'))
+        wp_appstore_frontend();
 }
 function wp_appstore_admin_menu() {
     add_menu_page( 'WP Appstore', 'WP AppStore', 'manage_options', basename( __FILE__ ), 'wp_appstore_main', null, 61 );
@@ -44,7 +46,6 @@ function wp_appstore_page_store($msg = false){
     if (is_array($updates) && isset($updates['wp-appstore']))
         unset($updates['wp-appstore']);
     $stats = $appstore->get_stats();
-//wp_appstore_frontend();
     ?>
 
     <div class="wrap">
@@ -1694,6 +1695,8 @@ function wp_appstore_activation() {
     update_option('wp_appstore_last_lib_update', time());
     $a = new WP_AppStore;
 	wp_schedule_event(time(), 'daily', 'wp_appstore_daily_event');
+    if(has_action('wp_appstore_twicedaily_event'))
+    wp_schedule_event(time(), 'twicedaily', 'wp_appstore_twicedaily_event');
 }
 function wp_appstore_deactivation() {
 	wp_clear_scheduled_hook('wp_appstore_daily_event');

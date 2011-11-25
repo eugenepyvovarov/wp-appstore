@@ -173,7 +173,7 @@ function wp_appstore_update_checker(){
 }
 
 add_action('wp_appstore_twicedaily_event', 'wp_appstore_update_checker');
-wp_schedule_event(time(), 'twicedaily', 'wp_appstore_twicedaily_event');
+
 function escape_quotes($str){
     $str = str_replace("'", "&#039;", $str);
     $str = str_replace('"', "&quot;", $str);

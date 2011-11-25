@@ -810,7 +810,8 @@ class WP_AppStore{
                     $wpdb->query($query);
                 }
             }
-        update_option('wp_appstore_formulas_rescan', false);    
+        update_option('wp_appstore_formulas_rescan', false);
+        update_option('wp_appstore_frontend_rescan', true);       
         }
     }
     
