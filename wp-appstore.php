@@ -276,8 +276,14 @@ function wp_appstore_page_store($msg = false){
     <?php
 }
 function wp_appstore_page_search_results($results){
-    $plugins = $results['plugin'];
-    $themes = $results['theme'];
+    $plugins = array();
+    $themes = array();
+    if (isset($results['plugin'])) {
+        $plugins = $results['plugin'];
+    }
+    if (isset($results['theme'])) {
+        $themes = $results['theme'];
+    }
     $updates = get_option('wp_appstore_plugins_for_update', array());
     if (is_array($updates) && isset($updates['wp-appstore']))
         unset($updates['wp-appstore']);
