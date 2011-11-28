@@ -278,18 +278,18 @@ function wp_appstore_page_store($msg = false){
 function wp_appstore_page_search_results($results){
     $plugins = array();
     $themes = array();
-    if (isset($results['plugin'])) {
+    if (isset($results['plugin']))
         $plugins = $results['plugin'];
-    }
-    if (isset($results['theme'])) {
+    if (isset($results['theme']))
         $themes = $results['theme'];
-    }
     $updates = get_option('wp_appstore_plugins_for_update', array());
     if (is_array($updates) && isset($updates['wp-appstore']))
         unset($updates['wp-appstore']);
     $appstore = $results['appstore_object'];
     $stats = $appstore->get_stats();
-    $tags = $results['tags'];
+    $tags = array();
+    if (isset($results['tags']))
+        $tags = $results['tags'];
     ?>
 
     <div class="wrap">
@@ -330,7 +330,7 @@ function wp_appstore_page_search_results($results){
                 <input type="hidden" value="search" name="screen" />
                     <p class="searchbox">
 	                   <label for="plugin-search-input" class="screen-reader-text">Search Formulas Library:</label>
-                       <input type="text" value="<?php echo $results['keyword']; ?>" name="s" id="plugin-search-input" style="margin-right: 1.5em;padding: .2em .3em;width: 95%;float: left;z-index: 999;"/>
+                       <input type="text" value="<?php if(isset($results['keyword'])) echo $results['keyword']; ?>" name="s" id="plugin-search-input" style="margin-right: 1.5em;padding: .2em .3em;width: 95%;float: left;z-index: 999;"/>
 	                   <ul class="search-options">
                             <li><input type="checkbox" value="1" checked="checked" name="plugin" title="Search Plugins" />Search Plugins</li>
                             <li><input type="checkbox" value="1" name="theme" title="Search Themes" />Search Themes</li>
@@ -461,7 +461,7 @@ function wp_appstore_page_search_results($results){
 
         <div id="post-body">
             <div id="post-body-content">
-            <?php if($results['serched_for']): ?>
+            <?php if(isset($results['serched_for'])): ?>
             <h2><?php echo $results['serched_for']; ?></h2>
             <?php endif; ?>
                 <?php if(sizeof($plugins) > 0): ?>
