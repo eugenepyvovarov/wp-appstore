@@ -4,7 +4,7 @@ Plugin Name: WP AppStore
 Plugin URI: http://wp-appstore.com
 Description: Premium plugins and themes
 Author: Lifeisgoodlabs   
-Version: 0.7.5
+Version: 1.0.5
 Author URI: http://www.wp-appstore.com
 */
 
@@ -98,7 +98,7 @@ function wp_appstore_page_store($msg = false){
                 </div>
             </div>  
             <div id="" class="postbox " style="">
-                <h3 class="hndle"><span>WP Appstore stats</span></h3>
+                <h3 class="hndle"><span>WP AppStore stats</span></h3>
                 <div class="inside">
                     <?php if (get_option('wp_appstore_file_permissions_denied')):?>
                     <p>Automatic formulas update blocked on your site. Try to do it manually switching folder permissions to 0777 or let us try to do it</p>
@@ -365,7 +365,7 @@ function wp_appstore_page_search_results($results){
             </div>
             <?php endif; ?>  
             <div id="" class="postbox " style="">
-                <h3 class="hndle"><span>WP Appstore stats</span></h3>
+                <h3 class="hndle"><span>WP AppStore stats</span></h3>
                 <div class="inside">
                     <p><?php echo $stats['last_update']; ?></a></p>
                     <p>Plugins formulas in database: <?php echo $stats['plugins']; ?></p>
