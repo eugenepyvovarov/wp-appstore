@@ -276,14 +276,20 @@ function wp_appstore_page_store($msg = false){
     <?php
 }
 function wp_appstore_page_search_results($results){
-    $plugins = $results['plugin'];
-    $themes = $results['theme'];
+    $plugins = array();
+    $themes = array();
+    if (isset($results['plugin']))
+        $plugins = $results['plugin'];
+    if (isset($results['theme']))
+        $themes = $results['theme'];
     $updates = get_option('wp_appstore_plugins_for_update', array());
     if (is_array($updates) && isset($updates['wp-appstore']))
         unset($updates['wp-appstore']);
     $appstore = $results['appstore_object'];
     $stats = $appstore->get_stats();
-    $tags = $results['tags'];
+    $tags = array();
+    if (isset($results['tags']))
+        $tags = $results['tags'];
     ?>
 
     <div class="wrap">
@@ -324,7 +330,7 @@ function wp_appstore_page_search_results($results){
                 <input type="hidden" value="search" name="screen" />
                     <p class="searchbox">
 	                   <label for="plugin-search-input" class="screen-reader-text">Search Formulas Library:</label>
-                       <input type="text" value="<?php echo $results['keyword']; ?>" name="s" id="plugin-search-input" style="margin-right: 1.5em;padding: .2em .3em;width: 95%;float: left;z-index: 999;"/>
+                       <input type="text" value="<?php if(isset($results['keyword'])) echo $results['keyword']; ?>" name="s" id="plugin-search-input" style="margin-right: 1.5em;padding: .2em .3em;width: 95%;float: left;z-index: 999;"/>
 	                   <ul class="search-options">
                             <li><input type="checkbox" value="1" checked="checked" name="plugin" title="Search Plugins" />Search Plugins</li>
                             <li><input type="checkbox" value="1" name="theme" title="Search Themes" />Search Themes</li>
@@ -455,7 +461,7 @@ function wp_appstore_page_search_results($results){
 
         <div id="post-body">
             <div id="post-body-content">
-            <?php if($results['serched_for']): ?>
+            <?php if(isset($results['serched_for'])): ?>
             <h2><?php echo $results['serched_for']; ?></h2>
             <?php endif; ?>
                 <?php if(sizeof($plugins) > 0): ?>
@@ -637,7 +643,7 @@ Please enter your email below and we will notify you when you can download an up
                     <div id="image_wrap">
                     
                     	<!-- Initially the image is a simple 1x1 pixel transparent GIF -->
-                    	<img src="<?php echo plugins_url( 'assets/img/blank.gif', __FILE__ ); ?>" height="375" />
+                    	<img src="<?php echo plugins_url( 'assets/img/blank.gif', __FILE__ ); ?>" width="530" />
                     
                     </div>
 
@@ -836,7 +842,7 @@ Please enter your email below and we will notify you when you can download an up
                     <div id="image_wrap">
                     
                     	<!-- Initially the image is a simple 1x1 pixel transparent GIF -->
-                    	<img src="<?php echo plugins_url( 'assets/img/blank.gif', __FILE__ ); ?>" height="375" />
+                    	<img src="<?php echo plugins_url( 'assets/img/blank.gif', __FILE__ ); ?>" width="530" />
                     
                     </div>
 
@@ -884,15 +890,15 @@ Please enter your email below and we will notify you when you can download an up
                     
                     	// call this function after it's loaded
                     	img.onload = function() {
-                    
+                            
                     		// make wrapper fully visible
                     		wrap.fadeTo("fast", 1);
                     
                     		// change the image
                     		wrap.find("img").attr("src", url);
-                    
+                            
                     	};
-                    
+                        
                     	// begin loading the image from www.flickr.com
                     	img.src = url;
                     
@@ -1446,7 +1452,7 @@ function wp_appstore_check_for_force_formulas_update() {
     }
 }
 function wp_appstore_myaccount() {
-   var_dump(get_posts());
+   //var_dump(get_posts());
 }
 function icon_path($item_object){
     if (strlen($item_object->icon) < 5)

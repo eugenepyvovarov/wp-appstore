@@ -624,7 +624,11 @@ class WP_AppStore{
                         
                         $tags = $tm['tags'];
                         unset($tm['tags']);
-                        $screenshots = $tm['screenshots'];
+                        $type = $tm['type'];
+                        $screenshots = array();
+                        if (isset($tm['screenshots'])) {
+                            $screenshots = $tm['screenshots'];
+                        }
                         unset($tm['screenshots']);
                         
 //Insert new themes                        
@@ -781,11 +785,11 @@ class WP_AppStore{
                         }
                         
                              
-                        $id = $tm['type'].'_id';
+                        $id = $type.'_id';
                         $tm['id'] = $$id;
                         $tm['screenshots'] = $screenshots;
                         $tm['tags'] = $tags;
-                        $this->formulas[$tm['type']][$$id] = (object)$tm;
+                        $this->formulas[$type][$$id] = (object)$tm;
                     }
                 }
             }
