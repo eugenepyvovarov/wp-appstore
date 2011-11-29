@@ -8,18 +8,26 @@ Version: 1.0
 Author URI: http://www.wp-appstore.com
 */
 
- require_once(ABSPATH . 'wp-admin/includes/plugin.php');
+
 if ( ! class_exists('WP_Upgrader') )
  include_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
- include_once 'wp-appstore.class.php';
+ 
+include_once 'wp-appstore.class.php';
+if(file_exists(WP_PLUGIN_DIR."/wp-appstore/tools/config.php"))
+    include_once WP_PLUGIN_DIR."/wp-appstore/tools/config.php";
+if (! function_exists('get_plugin_data'))
+    require_once(ABSPATH . 'wp-admin/includes/plugin.php');
 
+ 
 function wp_appstore_admin_init() {
     wp_enqueue_style( 'wp-appstore-css', plugins_url( basename( dirname( __FILE__ ) ) . '/wp-appstore.css' ), false, '20110322' );
-    wp_enqueue_style( 'wp-appstore-slider', plugins_url( basename( dirname( __FILE__ ) ) . '/nivo-slider/nivo-slider.css' ), false, '20110322' );
-    wp_enqueue_style( 'wp-appstore-slider1', plugins_url( basename( dirname( __FILE__ ) ) . '/nivo-slider/demo/style.css' ), false, '20110322' );
+    wp_enqueue_style( 'wp-appstore-slider', plugins_url( basename( dirname( __FILE__ ) ) . '/assets/scrollable-horizontal.css' ), false, '20110322' );
+    wp_enqueue_style( 'wp-appstore-slider-buttons', plugins_url( basename( dirname( __FILE__ ) ) . '/assets/scrollable-buttons.css' ), false, '20110322' );
     wp_enqueue_style( 'thickbox' );
-    wp_enqueue_script( 'wp-appstore-slider-js', plugins_url( basename( dirname( __FILE__ ) )  . '/nivo-slider/jquery.nivo.slider.js'), array( 'jquery'), '20110322' );
+    wp_enqueue_script( 'wp-appstore-slider-js', plugins_url( basename( dirname( __FILE__ ) )  . '/assets/jquery.tools.min.js'), array( 'jquery'), '20110322' );
     wp_enqueue_script('thickbox');
+    if(get_option('wp_appstore_frontend_rescan') && function_exists('wp_appstore_frontend'))
+        wp_appstore_frontend();
 }
 function wp_appstore_admin_menu() {
     add_menu_page( 'WP Appstore', 'WP AppStore', 'manage_options', basename( __FILE__ ), 'wp_appstore_main', null, 61 );
@@ -38,9 +46,6 @@ function wp_appstore_page_store($msg = false){
     if (is_array($updates) && isset($updates['wp-appstore']))
         unset($updates['wp-appstore']);
     $stats = $appstore->get_stats();
-    //wp_appstore_myaccount();
-    //var_dump(get_option('wp_appstore_plugins_for_update'));
-
     ?>
 
     <div class="wrap">
@@ -626,26 +631,84 @@ Please enter your email below and we will notify you when you can download an up
                         </div>
                         <div class="latest_changes"></div>
                     </div>
-                    <?php #TODO find normal slider ?>
-                    <?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true): //if(count($plugin_info->screenshots)>0): ?>
-                    <div id="namediv" class="stuffbox">
-                        <h3><label for="link_name">Screenshots</label></h3>
-                        <div class="inside">
-                        <div id="slider" class="nivoSlider">
-                            <?php foreach($plugin_info->screenshots as $one): ?>
-                            <img src="<?php echo $one ?>" alt="" />
-                        <?php endforeach; ?>
-                        </div>
-                        <div id="htmlcaption" class="nivo-html-caption">
-                            <strong>This</strong> is an example of a <em>HTML</em> caption with <a href="#">a link</a>.
-                        </div>
-                        </div>
-                        <script type="text/javascript">
-                        jQuery(window).load(function() {
-                            jQuery('#nivo-slider').nivoSlider({effect:'sliceDownRight',animSpeed:500, pauseTime:7500});
-                        });
-                        </script>
+                    <?php if(count($plugin_info->screenshots)>0): ?>
+                    <!-- slider -->
+                    <!-- wrapper element for the large image -->
+                    <div id="image_wrap">
+                    
+                    	<!-- Initially the image is a simple 1x1 pixel transparent GIF -->
+                    	<img src="<?php echo plugins_url( 'assets/img/blank.gif', __FILE__ ); ?>" height="375" />
+                    
                     </div>
+
+
+                    <!-- "previous page" action -->
+                    <a class="prev browse left"></a>
+                    
+                    <!-- root element for scrollable -->
+                    <div class="scrollable">   
+                       
+                       <!-- root element for the items -->
+                       <div class="items">
+                          <div>
+                          <?php for ($i=1;$i <= count($plugin_info->screenshots); $i++): ?>
+                            <?php if(!($i % 5)) echo '</div><div>'; ?>
+                            <?php echo '<img src="'.$plugin_info->screenshots[$i-1].'" />' ?>
+                          <?php endfor; ?>
+                          </div>  
+                       </div>
+                       
+                    </div>
+
+                    <!-- "next page" action -->
+                    <a class="next browse right"></a>
+                    <script>
+                    // execute your scripts when the DOM is ready. this is mostly a good habit
+                    jQuery(document).ready(function($) {
+                    
+                    	// initialize scrollable
+                    	$(".scrollable").scrollable();
+                        $(".items img").click(function() {
+                    
+                    	// see if same thumb is being clicked
+                    	if ($(this).hasClass("active")) { return; }
+                    
+                    	// calclulate large image's URL based on the thumbnail URL (flickr specific)
+                    	var url = $(this).attr("src")//.replace("_t", "");
+                    
+                    	// get handle to element that wraps the image and make it semi-transparent
+                    	var wrap = $("#image_wrap").fadeTo("medium", 0.5);
+                    
+                    	// the large image from www.flickr.com
+                    	var img = new Image();
+                    
+                    
+                    	// call this function after it's loaded
+                    	img.onload = function() {
+                    
+                    		// make wrapper fully visible
+                    		wrap.fadeTo("fast", 1);
+                    
+                    		// change the image
+                    		wrap.find("img").attr("src", url);
+                    
+                    	};
+                    
+                    	// begin loading the image from www.flickr.com
+                    	img.src = url;
+                    
+                    	// activate item
+                    	$(".items img").removeClass("active");
+                    	$(this).addClass("active");
+                    
+                    // when page loads simulate a "click" on the first image
+                    }).filter(":first").click();
+                    
+                    });
+                    </script>
+
+
+                    <!-- endof slider -->
                     <?php endif; ?>
                 </div>
             </div>
@@ -767,26 +830,84 @@ Please enter your email below and we will notify you when you can download an up
                         </div>
                         <div class="latest_changes"></div>
                     </div>
-                    <?php #TODO find normal slider ?>
-                    <?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true): //if(count($theme_info->screenshots)>0): ?>
-                    <div id="namediv" class="stuffbox">
-                        <h3><label for="link_name">Screenshots</label></h3>
-                        <div class="inside">
-                        <div id="nivo-slider" class="nivoSlider">
-                            <?php foreach($theme_info->screenshots as $one): ?>
-                            <img src="<?php echo $one ?>" alt="" />
-                        <?php endforeach; ?>
-                        </div>
-                        <div id="htmlcaption" class="nivo-html-caption">
-                            <strong>This</strong> is an example of a <em>HTML</em> caption with <a href="#">a link</a>.
-                        </div>
-                        </div>
-                        <script type="text/javascript">
-                        jQuery(window).load(function() {
-                            jQuery('#nivo-slider').nivoSlider({effect:'sliceDownRight',animSpeed:500, pauseTime:7500});
-                        });
-                        </script>
+                    <?php if(count($theme_info->screenshots)>0): ?>
+                    <!-- slider -->
+                    <!-- wrapper element for the large image -->
+                    <div id="image_wrap">
+                    
+                    	<!-- Initially the image is a simple 1x1 pixel transparent GIF -->
+                    	<img src="<?php echo plugins_url( 'assets/img/blank.gif', __FILE__ ); ?>" height="375" />
+                    
                     </div>
+
+
+                    <!-- "previous page" action -->
+                    <a class="prev browse left"></a>
+                    
+                    <!-- root element for scrollable -->
+                    <div class="scrollable">   
+                       
+                       <!-- root element for the items -->
+                       <div class="items">
+                          <div>
+                          <?php for ($i=1;$i <= count($theme_info->screenshots); $i++): ?>
+                            <?php if(!($i % 5)) echo '</div><div>'; ?>
+                            <?php echo '<img src="'.$theme_info->screenshots[$i-1].'" />' ?>
+                          <?php endfor; ?>
+                          </div>  
+                       </div>
+                       
+                    </div>
+
+                    <!-- "next page" action -->
+                    <a class="next browse right"></a>
+                    <script>
+                    // execute your scripts when the DOM is ready. this is mostly a good habit
+                    jQuery(document).ready(function($) {
+                    
+                    	// initialize scrollable
+                    	$(".scrollable").scrollable();
+                        $(".items img").click(function() {
+                    
+                    	// see if same thumb is being clicked
+                    	if ($(this).hasClass("active")) { return; }
+                    
+                    	// calclulate large image's URL based on the thumbnail URL (flickr specific)
+                    	var url = $(this).attr("src")//.replace("_t", "");
+                    
+                    	// get handle to element that wraps the image and make it semi-transparent
+                    	var wrap = $("#image_wrap").fadeTo("medium", 0.5);
+                    
+                    	// the large image from www.flickr.com
+                    	var img = new Image();
+                    
+                    
+                    	// call this function after it's loaded
+                    	img.onload = function() {
+                    
+                    		// make wrapper fully visible
+                    		wrap.fadeTo("fast", 1);
+                    
+                    		// change the image
+                    		wrap.find("img").attr("src", url);
+                    
+                    	};
+                    
+                    	// begin loading the image from www.flickr.com
+                    	img.src = url;
+                    
+                    	// activate item
+                    	$(".items img").removeClass("active");
+                    	$(this).addClass("active");
+                    
+                    // when page loads simulate a "click" on the first image
+                    }).filter(":first").click();
+                    
+                    });
+                    </script>
+
+
+                    <!-- endof slider -->
                     <?php endif; ?>
                 </div>
             </div>
@@ -1034,18 +1155,17 @@ function wp_appstore_main() {
                         wp_update_plugins();
                     }
                     $for_update = get_option('wp_appstore_plugins_for_update');
-                    if (!$plugin = $for_update[$plugin_slug]['file']) {
+                    if (isset($for_update[$plugin_slug]['file'])) {
                         if (!isset($current->response[$plugin])) {
-                          wp_die(__('Error occured while update of this plugin.'));  
-                        }
-                    }else{
-                        if (!isset($current->response[$plugin])) {
-                            if ($package = wp_appstore_prepare_package($for_update[$plugin_slug]['object']->link, $for_update[$plugin_slug]['object']->slug))
-                                $for_update[$plugin_slug]['object']->link = $package;
-                            
+                            if ($package = wp_appstore_prepare_package($for_update[$plugin_slug]['object']->package, $for_update[$plugin_slug]['object']->slug))
+                                $for_update[$plugin_slug]['object']->package = $package;
                             $current->response[$plugin] = $for_update[$plugin_slug]['object'];
                             set_site_transient('update_plugins', $current);
                         }
+                    }
+                    if (!isset($for_update[$plugin_slug]['file']) &&  !isset($current->response[$plugin])) {
+                        delete_option('wp_appstore_autoupdate_request');
+                        wp_appstore_page_store();
                     }
             		$title = sprintf( __('Update Plugin: %s'), 'WP Appstore');
                     
@@ -1055,9 +1175,12 @@ function wp_appstore_main() {
             		$nonce = 'upgrade-plugin_' . $plugin;
                     $url = 'admin.php?page=wp-appstore.php&screen=autoupdate';
             		$upgrader = new Plugin_Upgrader( new WPAppstore_Plugin_Upgrader_Skin( compact('title', 'nonce', 'url', 'plugin') ) );
-            		$upgrader->upgrade($plugin);
-                    unset($for_update[$plugin_slug]);
-                    update_option('wp_appstore_plugins_for_update', $for_update);
+            		$result = $upgrader->upgrade($plugin);
+                    if ($result !== false && !is_wp_error($result)) {
+                        unset($for_update[$plugin_slug]);
+                        update_option('wp_appstore_plugins_for_update', $for_update);
+                        delete_option('wp_appstore_autoupdate_request');
+                    }
             }
             break;
         case 'plugin-update':
@@ -1271,10 +1394,10 @@ function wp_appstore_main() {
             }
             break;
         case 'force-formulas-update':
-            /*if ( ! current_user_can('update_plugins') )
+            if ( ! current_user_can('update_plugins') )
     			wp_die(__('You do not have sufficient permissions to update plugins for this site.'));
             if (!get_option('wp_appstore_file_permissions_denied'))
-                wp_appstore_page_store();*/
+                wp_appstore_page_store();
             //check_admin_referer('upgrade-formulas');
             global $wp_filesystem;
             $url = 'admin.php?page=wp-appstore.php&screen=force-formulas-update';
@@ -1323,7 +1446,7 @@ function wp_appstore_check_for_force_formulas_update() {
     }
 }
 function wp_appstore_myaccount() {
-   // echo "456"; 
+   var_dump(get_posts());
 }
 function icon_path($item_object){
     if (strlen($item_object->icon) < 5)
@@ -1353,11 +1476,15 @@ function get_tmp_path(){
 			return $temp;
 	}
 	$temp = '/tmp/';
-	return $temp;
+    if ( is_dir($temp) && @is_writable($temp) )
+	   return $temp;
     return false;
 }
 
 function wp_appstore_update_formulas() {
+    @ini_set( 'max_execution_time', 360 );
+    @set_time_limit( 360 );
+    
     global $wp_filesystem;
     if (!get_tmp_path()) {
         wp_die(__('You do not have sufficient permissions to update formulas on this site.'));
@@ -1396,18 +1523,6 @@ function wp_appstore_update_formulas() {
                 $repo_ver = WP_AppStore::str_to_float($repo_plugin_headers['Version']);
                 $site_ver = WP_AppStore::str_to_float($site_plugin_headers['Version']);
                 if ($repo_ver > $site_ver) {
-                    $api = new StdClass;
-                    $api->id = 1;
-                    $api->slug = 'wp-appstore';
-                    $api->new_version = $repo_plugin_headers['Version'];
-                    $api->url = $repo_plugin_headers['PluginURI'];
-                    $api->package = $download_url;
-                    
-                   
-                    $current = get_site_transient( 'update_plugins' );
-                    $current->response['wp-appstore/wp-appstore.php'] = $api;
-                    $current->last_checked = time();
-                    set_site_transient('update_plugins', $current);  //whether to actually check for updates, so we reset it to zero.
                     $for_update['wp-appstore'] = array('file' => 'wp-appstore/wp-appstore.php', 'object' => $api);
                     update_option('wp_appstore_plugins_for_update', $for_update);
                     update_option('wp_appstore_autoupdate_request', true);
@@ -1438,6 +1553,9 @@ function wp_appstore_update_formulas() {
     unlink($wp_appstore_plugin);
     update_option('wp_appstore_formulas_rescan', true);
     update_option('wp_appstore_last_lib_update', time());
+    if (function_exists('wp_appstore_frontend')) {
+        wp_appstore_frontend();
+    }
 }
 
 function wp_appstore_get_plugin_string_for_update($plugin_slug){
@@ -1463,10 +1581,10 @@ function wp_appstore_get_plugin_string_for_update($plugin_slug){
 }
 function wp_appstore_prepare_package($url, $folder_slug){
     if (!$file = file_get_contents($url)) {
-        wp_die(__('We have an error while downloading package.'));
+        return false;
     }
     if (!get_tmp_path()) {
-        wp_die(__('We have an error while saving package.'));
+        return false;
     }
     $tmp_file_name = get_tmp_path().'tmp.zip';
     file_put_contents($tmp_file_name, $file);
@@ -1489,7 +1607,6 @@ function wp_appstore_prepare_package($url, $folder_slug){
         $zip->close();
         return $tmp_file_name;
     } else {
-        echo 'failed, code:' . $res;
         return false;
     }
 }
@@ -1578,13 +1695,17 @@ function wp_appstore_activation() {
     update_option('wp_appstore_last_lib_update', time());
     $a = new WP_AppStore;
 	wp_schedule_event(time(), 'daily', 'wp_appstore_daily_event');
+    if(has_action('wp_appstore_twicedaily_event'))
+    wp_schedule_event(time(), 'twicedaily', 'wp_appstore_twicedaily_event');
 }
 function wp_appstore_deactivation() {
 	wp_clear_scheduled_hook('wp_appstore_daily_event');
+    wp_clear_scheduled_hook('wp_appstore_twicedaily_event');
 }
 function wp_appstore_uninstall() {
     global $wpdb;
     wp_clear_scheduled_hook('wp_appstore_daily_event');
+    wp_clear_scheduled_hook('wp_appstore_twicedaily_event');
     $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'appstore_plugins');
     $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'appstore_plugins_tags');
     $wpdb->query('DROP TABLE IF EXISTS ' . $wpdb->prefix . 'appstore_screenshots');
