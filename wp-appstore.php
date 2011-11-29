@@ -643,7 +643,7 @@ Please enter your email below and we will notify you when you can download an up
                     <div id="image_wrap">
                     
                     	<!-- Initially the image is a simple 1x1 pixel transparent GIF -->
-                    	<img src="<?php echo plugins_url( 'assets/img/blank.gif', __FILE__ ); ?>" height="375" />
+                    	<img src="<?php echo plugins_url( 'assets/img/blank.gif', __FILE__ ); ?>" width="530" />
                     
                     </div>
 
@@ -842,7 +842,7 @@ Please enter your email below and we will notify you when you can download an up
                     <div id="image_wrap">
                     
                     	<!-- Initially the image is a simple 1x1 pixel transparent GIF -->
-                    	<img src="<?php echo plugins_url( 'assets/img/blank.gif', __FILE__ ); ?>" height="375" />
+                    	<img src="<?php echo plugins_url( 'assets/img/blank.gif', __FILE__ ); ?>" width="530" />
                     
                     </div>
 
@@ -890,15 +890,15 @@ Please enter your email below and we will notify you when you can download an up
                     
                     	// call this function after it's loaded
                     	img.onload = function() {
-                    
+                            
                     		// make wrapper fully visible
                     		wrap.fadeTo("fast", 1);
                     
                     		// change the image
                     		wrap.find("img").attr("src", url);
-                    
+                            
                     	};
-                    
+                        
                     	// begin loading the image from www.flickr.com
                     	img.src = url;
                     
@@ -1452,7 +1452,7 @@ function wp_appstore_check_for_force_formulas_update() {
     }
 }
 function wp_appstore_myaccount() {
-   var_dump(get_posts());
+   //var_dump(get_posts());
 }
 function icon_path($item_object){
     if (strlen($item_object->icon) < 5)

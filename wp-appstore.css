@@ -93,6 +93,8 @@ div.star {
 div.star img {
 	width: 19px;
 	height: 19px;
+    border-left: 1px solid #FFFFFF;
+    border-right: 1px solid #FFFFFF;
 }
 /*.plugin .star1, .theme .star1, .star1{
     background: transparent url('images/1star.png') no-repeat;

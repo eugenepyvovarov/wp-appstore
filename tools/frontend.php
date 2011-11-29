@@ -201,7 +201,7 @@ function insertPost($title, $content, $slug = null, $timestamp = null, $category
   		'comment_status'          => $comment_status,
   		'ping_status'             => $allowpings,
     ));
-    var_dump( wp_set_object_terms($postid, $category, 'wp-appstore-category'));
+    wp_set_object_terms($postid, $category, 'wp-appstore-category');
     	
 		foreach($meta as $key => $value) 
 			update_post_meta($postid, $key, $value);			
@@ -223,7 +223,7 @@ function updatePost($id, $title, $content, $slug = null, $timestamp = null, $cat
     ));
     $category = array_map('intval', $category);
     $category = array_unique( $category );
-    var_dump(wp_set_object_terms($postid, $category, 'wp-appstore-category'));	
+    wp_set_object_terms($postid, $category, 'wp-appstore-category');	
 		foreach($meta as $key => $value) 
 			update_post_meta($postid, $key, $value);			
 		
