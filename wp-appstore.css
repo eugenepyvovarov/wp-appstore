@@ -96,6 +96,9 @@ div.star img {
     border-left: 1px solid #FFFFFF;
     border-right: 1px solid #FFFFFF;
 }
+.star-average, .star.star-rating {
+    background-color: #FFCC00;
+}
 /*.plugin .star1, .theme .star1, .star1{
     background: transparent url('images/1star.png') no-repeat;
 }

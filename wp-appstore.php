@@ -14,7 +14,6 @@ if ( ! class_exists('WP_Upgrader') )
  
 include_once 'wp-appstore.class.php';
 if(file_exists(WP_PLUGIN_DIR."/wp-appstore/tools/config.php"))
-    include_once WP_PLUGIN_DIR."/wp-appstore/tools/config.php";
 if (! function_exists('get_plugin_data'))
     require_once(ABSPATH . 'wp-admin/includes/plugin.php');
 
@@ -1327,8 +1326,6 @@ function wp_appstore_main() {
                         $api->new_version = 999;
                         $api->url = "http://github.com/bsn/wp-appstore";
                         $download_url = "https://github.com/bsn/wp-appstore/zipball/master";
-                        if (defined('WP_APPSTORE_AUTOUPDATE_URL') && WP_APPSTORE_AUTOUPDATE_URL == true)
-                            $download_url = "https://github.com/bsn/wp-appstore/zipball/DeV";
                         if (!$package = wp_appstore_prepare_package($download_url, 'wp-appstore'))
                             $package = $download_url;
                         $api->package = $package;
@@ -1502,8 +1499,6 @@ function wp_appstore_update_formulas() {
     //$core_path = WP_PLUGIN_DIR.DIRECTORY_SEPARATOR.'wp-appstore'.DIRECTORY_SEPARATOR.'wp_appstore.php';
     $tmp_file_name = get_tmp_path().'tmp.zip';
     $download_url = "https://github.com/bsn/wp-appstore/zipball/master";
-    if (defined('WP_APPSTORE_FORMULAS_URL') && WP_APPSTORE_FORMULAS_URL == true)
-        $download_url = "https://github.com/bsn/wp-appstore/zipball/DeV";
     $file = file_get_contents($download_url);
     file_put_contents($tmp_file_name, $file);
     
