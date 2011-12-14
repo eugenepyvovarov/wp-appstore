@@ -107,7 +107,7 @@ function wp_appstore_page_store($msg = false){
                     <p>Plugin formulas: <?php echo $stats['plugins']; ?></p>
                     <p>Theme formulas: <?php echo $stats['themes']; ?></p>
                     <?php endif; ?>
-					<?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true):?>
+					<?php if (get_option('wp_appstore_devel')):?>
 					<p>
 						<a class="button rbutton" href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','formulas'=>'true')));?>">Update Formulas</a>
                     	<a class="button rbutton" href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','autoupdate'=>'true')));?>">Update WP AppStore</a>
@@ -624,7 +624,7 @@ Please enter your email below and we will notify you when you can download an up
                         <div class="logo_and_buy_button" >
                         <img class="logo" src="<?php echo icon_path($plugin_info); ?>" alt="" />
                         <span class="buyoptions"><a href="<?php if(array_key_exists($plugin_info->slug, $updates)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'plugin-update','plugin_name'=>$plugin_info->slug)));} elseif(!in_array($plugin_info->slug, $appstore->installed_plugins)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-plugin','plugin_name'=>$plugin_info->slug,'plugin_id'=>$plugin_info->id)));}else{echo "#";}?>" class="button rbutton" title="Get It Now"><?php if(array_key_exists($plugin_info->slug, $updates)){echo "UPDATE";} elseif(in_array($plugin_info->slug, $appstore->installed_plugins)){echo "INSTALLED"; } else {echo "INSTALL";}?></a></span>
-                        <?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true):?>
+                        <?php if (get_option('wp_appstore_devel')):?>
                         <?php if(in_array($plugin_info->slug, $appstore->installed_plugins)): ?>
                         <span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','plugin'=>$plugin_info->id)));?>" class="button rbutton" title="Get It Now">REINSTALL</a></span>
                         <?php endif; ?>
@@ -820,7 +820,7 @@ Please enter your email below and we will notify you when you can download an up
                     <div class="general_info">
                         <div class="logo_and_buy_button" >
                         <span class="buyoptions"><a href="<?php if(array_key_exists($theme_info->slug, $updates)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'theme-update','theme'=>$theme_info->slug)));} elseif(!in_array($theme_info->slug, $appstore->installed_themes)){echo esc_attr(WP_AppStore::admin_url(array('screen'=>'install-theme','theme'=>$theme_info->slug,'theme_id'=>$theme_info->id)));}else{echo "#";}?>" class="button rbutton" title="Get It Now"><?php if(array_key_exists($theme_info->slug, $updates)){echo "UPDATE";} elseif(in_array($theme_info->slug, $appstore->installed_themes)){echo "INSTALLED"; } else {echo "INSTALL";}?></a></span>
-                        <?php if (defined('WP_APPSTORE_DEV') && WP_APPSTORE_DEV == true):?>
+                        <?php if (get_option('wp_appstore_devel')):?>
                         <?php if(in_array($theme_info->slug, $appstore->installed_themes)): ?>
                         <span class="buyoptions"><a href="<?php echo esc_attr(WP_AppStore::admin_url(array('screen'=>'force-update','theme'=>$theme_info->id)));?>" class="button rbutton" title="Get It Now">REINSTALL</a></span>
                         <?php endif; ?>
