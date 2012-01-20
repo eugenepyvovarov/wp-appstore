@@ -13,7 +13,8 @@ if ( ! class_exists('WP_Upgrader') )
  include_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
  
 include_once 'wp-appstore.class.php';
-if(file_exists(WP_PLUGIN_DIR."/wp-appstore/tools/config.php"))
+include_once 'wp-appstore-upgrader.class.php';
+include_once 'wp-appstore-bundles.php';
 if (! function_exists('get_plugin_data'))
     require_once(ABSPATH . 'wp-admin/includes/plugin.php');
 
@@ -33,6 +34,7 @@ function wp_appstore_admin_menu() {
     add_submenu_page( basename( __FILE__ ), 'All Plugins', 'All Plugins', 'manage_options', basename( __FILE__ ).'&screen=all-plugins', 'wp_appstore_main' );
     add_submenu_page( basename( __FILE__ ), 'All Themes', 'All Themes', 'manage_options', basename( __FILE__ ).'&screen=all-themes', 'wp_appstore_main' );
     add_submenu_page( basename( __FILE__ ), 'Installed', 'Installed', 'manage_options', basename( __FILE__ ).'&screen=installed', 'wp_appstore_main' );
+    add_submenu_page( basename( __FILE__ ), 'Wizard', 'Wizard', 'manage_options', basename( __FILE__ ).'&screen=wizard', 'wp_appstore_main' );
 }
 function wp_appstore_page_store($msg = false){
     $appstore = new WP_AppStore();
@@ -922,8 +924,53 @@ Please enter your email below and we will notify you when you can download an up
 }
 
 function wp_appstore_main() {
-    $pages = array('store', 'search', 'tag-filter', 'all-plugins', 'all-themes', 'view-plugin', 'view-theme', 'install-plugin', 'install-theme', 'autoupdate', 'plugin-update', 'theme-update', 'installed', 'featured-plugins', 'featured-themes', 'force-formulas-update', 'force-update');
+    $pages = array('store', 'search', 'tag-filter', 'all-plugins', 'all-themes', 'view-plugin', 'view-theme', 'install-plugin', 'install-theme', 'autoupdate', 'plugin-update', 'theme-update', 'installed', 'featured-plugins', 'featured-themes', 'force-formulas-update', 'force-update', 'myacc', 'activate-bundle', 'wizard', 'prepare-bundle');
     $page = '';
+    if (isset($_REQUEST['prepared-bundle'])) {
+        $bundles = get_site_transient('wp_appstore_bundles');
+        if (!isset($bundles[$_REQUEST['prepared-bundle']])) {
+            wp_appstore_wizard_bundles();
+            exit;
+        }
+        if (!is_array($_REQUEST['plugin']))
+            $_REQUEST['plugin'] = array();
+        if (!is_array($_REQUEST['theme']))
+            $_REQUEST['theme'] = array();
+            
+        if (is_array($bundles[$_REQUEST['prepared-bundle']]['plugins'])) {
+            foreach ($bundles[$_REQUEST['prepared-bundle']]['plugins'] as &$plugin) {
+                if (in_array($plugin['slug'], $_REQUEST['plugin'])) {
+                    $plugin['installed'] = false;
+                }else{
+                    $plugin['installed'] = true;
+                }
+            }
+            unset($plugin);
+        }
+        if (is_array($bundles[$_REQUEST['prepared-bundle']]['themes'])) {
+            foreach ($bundles[$_REQUEST['prepared-bundle']]['themes'] as &$theme) {
+                if (in_array($theme['slug'], $_REQUEST['theme'])) {
+                    $theme['installed'] = false;
+                }else{
+                    $theme['installed'] = true;
+                }
+            }
+            unset($theme);
+        }
+        if (!$_REQUEST['status'] || $_REQUEST['status'] != 'rfc') {
+            set_site_transient('wp_appstore_bundles', $bundles);
+        }
+        $title = sprintf( __('Installing Bundle: %s'), $bundles[$_REQUEST['prepared-bundle']]['title'] );
+  		//$nonce = 'bundle' . $api->slug;
+        $bundle_slug = $_REQUEST['prepared-bundle'];
+
+        
+  		$url = 'admin.php?page=wp-appstore.php&prepared-bundle='.$bundle_slug.'&status=rfc' ;
+        $upgrader = new WP_AppStore_Extension_Upgrader( new WP_AppStore_Bundle_Installer_Skin( compact('title', 'url', 'nonce', 'bundle_slug') ) );
+        $upgrader->bundle_install($_REQUEST['prepared-bundle']);
+        
+        exit;
+    }
     if(!isset($_GET['screen']) || !in_array($_GET['screen'],$pages)){
         $page = 'store';
     } else {
@@ -932,6 +979,14 @@ function wp_appstore_main() {
     switch($page){
         case 'store':
             wp_appstore_page_store();
+            break;
+        case 'myacc':
+            wp_appstore_myaccount();
+            break;
+        case 'wizard':
+            $appstore = new WP_AppStore();
+            $appstore->read_bundles();
+            wp_appstore_wizard_bundles();
             break;
         case 'view-plugin':
             if(isset($_GET['plugin_id']) && (intval($_GET['plugin_id']) > 0)){
@@ -1086,7 +1141,6 @@ function wp_appstore_main() {
                 if($plugin_info === null){
                     wp_appstore_page_store();
                 } else {
-                    // $api = plugins_api('plugin_information', array('slug' => $plugin, 'fields' => array('sections' => false) ) ); //Save on a bit of bandwidth.
                     $api = new StdClass;
                     $api->id = $plugin_info->id;
                     $api->name = $plugin_info->title;
@@ -1095,13 +1149,8 @@ function wp_appstore_main() {
                     $api->author = $plugin_info->author;
                     $api->required = '2.5';
                     $api->tested = '3.1.1';
-                    if (!$package = wp_appstore_prepare_package($plugin_info->link, $plugin_info->slug))
-                            $package = $plugin_info->link;
-                    $api->download_link = $package;
+                    $api->download_link = $plugin_info->link;
                     
-            		if ( is_wp_error($api) )
-            	 		wp_die($api);
-
             		$title = sprintf( __('Installing Plugin: %s'), $api->name . ' ' . $api->version );
             		$nonce = 'install-plugin_' . $api->slug;
             		$url = 'admin.php?page=wp-appstore.php&screen=install-plugin&plugin_name='. $api->slug . '&plugin_id='. $api->id ;
@@ -1110,8 +1159,8 @@ function wp_appstore_main() {
 
             		$type = 'web'; //Install plugin type, From Web or an Upload.
 
-            		$upgrader = new Plugin_Upgrader( new WPAppstore_Plugin_Installer_Skin( compact('title', 'url', 'nonce', 'plugin', 'api') ) );
-            		$upgrader->install($api->download_link);
+            		$upgrader = new WP_AppStore_Extension_Upgrader( new WPAppstore_Plugin_Installer_Skin( compact('title', 'url', 'nonce', 'plugin', 'api') ) );
+            		$upgrader->plugin_install($api->download_link, $api->slug);
         		}
             }
             break;
@@ -1131,9 +1180,6 @@ function wp_appstore_main() {
                         $api->version = $theme_info->version;
                         $api->author = $theme_info->author;
                         $api->download_link = $theme_info->link;
-                        if (!$package = wp_appstore_prepare_package($theme_info->link, $theme_info->slug))
-                            $package = $theme_info->link;
-                        $api->download_link = $package;
                         
                         $title = sprintf( __('Installing Theme: %s'), $api->name . ' ' . $api->version );
                 		$nonce = 'install-theme_' . $api->slug;
@@ -1141,8 +1187,8 @@ function wp_appstore_main() {
                         
                         $type = 'web';
                         
-                        $upgrader = new Theme_Upgrader( new WPAppstore_Theme_Installer_Skin( compact('title', 'url', 'nonce', 'plugin', 'api') ) );
-                        $upgrader->install($api->download_link);
+                        $upgrader = new WP_AppStore_Extension_Upgrader( new WPAppstore_Theme_Installer_Skin( compact('title', 'url', 'nonce', 'plugin', 'api') ) );
+                        $upgrader->theme_install($api->download_link, $api->slug);
 
                     }
                 }
@@ -1160,14 +1206,7 @@ function wp_appstore_main() {
                         wp_update_plugins();
                     }
                     $for_update = get_option('wp_appstore_plugins_for_update');
-                    if (isset($for_update[$plugin_slug]['file'])) {
-                        if (!isset($current->response[$plugin])) {
-                            if ($package = wp_appstore_prepare_package($for_update[$plugin_slug]['object']->package, $for_update[$plugin_slug]['object']->slug))
-                                $for_update[$plugin_slug]['object']->package = $package;
-                            $current->response[$plugin] = $for_update[$plugin_slug]['object'];
-                            set_site_transient('update_plugins', $current);
-                        }
-                    }
+
                     if (!isset($for_update[$plugin_slug]['file']) &&  !isset($current->response[$plugin])) {
                         delete_option('wp_appstore_autoupdate_request');
                         wp_appstore_page_store();
@@ -1177,10 +1216,12 @@ function wp_appstore_main() {
                     $parent_file = 'plugins.php';
                     $submenu_file = 'plugins.php';
                     
-            		$nonce = 'upgrade-plugin_' . $plugin;
-                    $url = 'admin.php?page=wp-appstore.php&screen=autoupdate';
-            		$upgrader = new Plugin_Upgrader( new WPAppstore_Plugin_Upgrader_Skin( compact('title', 'nonce', 'url', 'plugin') ) );
-            		$result = $upgrader->upgrade($plugin);
+            		$nonce = 'upgrade-plugin_' . $plugin_slug;
+
+                    $url = 'admin.php?page=wp-appstore.php&screen=plugin-update&plugin_name='. $plugin_slug ;
+
+            		$upgrader = new WP_AppStore_Extension_Upgrader( new WPAppstore_Plugin_Upgrader_Skin( compact('title', 'nonce', 'url', 'plugin') ) );
+                    $result = $upgrader->plugin_upgrade($plugin_slug);
                     if ($result !== false && !is_wp_error($result)) {
                         unset($for_update[$plugin_slug]);
                         update_option('wp_appstore_plugins_for_update', $for_update);
@@ -1203,30 +1244,18 @@ function wp_appstore_main() {
                     $for_update = get_option('wp_appstore_plugins_for_update');
                     if (!$plugin = $for_update[$plugin_slug]['file']) {
                         $plugin = wp_appstore_get_plugin_string_for_update($plugin_slug);
-                        if (!isset($current->response[$plugin])) {
-                          wp_die(__('Error occured while update of this plugin.'));  
-                        }
-                    }else{
-                        if (!isset($current->response[$plugin])) {
-                            if ($package = wp_appstore_prepare_package($for_update[$plugin_slug]['object']->link, $for_update[$plugin_slug]['object']->slug))
-                                $for_update[$plugin_slug]['object']->link = $package;
-                            $current->response[$plugin] = $for_update[$plugin_slug]['object'];
-                            set_site_transient('update_plugins', $current);
-                        }
                     }
           			$title = __('Update Plugin');
                     
                     $parent_file = 'plugins.php';
                     $submenu_file = 'plugins.php';
                     
-            		$nonce = 'upgrade-plugin_' . $plugin;
+            		$nonce = 'upgrade-plugin_' . $plugin_slug;
 
                     $url = 'admin.php?page=wp-appstore.php&screen=plugin-update&plugin_name='. $plugin_slug ;
 
-            		$upgrader = new Plugin_Upgrader( new WPAppstore_Plugin_Upgrader_Skin( compact('title', 'nonce', 'url', 'plugin') ) );
-                    $upgrader->upgrade($plugin);
-                    unset($for_update[$plugin_slug]);
-                    update_option('wp_appstore_plugins_for_update', $for_update);
+            		$upgrader = new WP_AppStore_Extension_Upgrader( new WPAppstore_Plugin_Upgrader_Skin( compact('title', 'nonce', 'url', 'plugin') ) );
+                    $upgrader->plugin_upgrade($plugin_slug);
             }
             break;
         case 'theme-update':
@@ -1237,23 +1266,6 @@ function wp_appstore_main() {
                 // check_admin_referer('install-plugin_' . $plugin);
                 // $plugin here is 'folder/file.php', $plugin_slug is a slug.
                     $theme = $_GET['theme'];
-                    $current = get_site_transient( 'update_themes' );
-                    if (!is_object($current)) {
-                        wp_update_themes();
-                    }
-                    $for_update = get_option('wp_appstore_themes_for_update');
-                    if (!isset($for_update[$theme])) {
-                        if (!isset($current->response[$theme])) {
-                          wp_die(__('Error occured while update of this plugin.'));  
-                        }
-                    }else{
-                        if (!isset($current->response[$theme])) {
-                            if ($package = wp_appstore_prepare_package($for_update[$theme]['object']->link, $theme))
-                                $for_update[$plugin_slug]['object']->link = $package;
-                            $current->response[$theme] = $for_update[$theme]['object'];
-                            set_site_transient('update_plugins', $current);
-                        }
-                    }
 
                     $title = __('Update Theme');
             		$parent_file = 'themes.php';
@@ -1263,10 +1275,8 @@ function wp_appstore_main() {
             		$url = 'update.php?action=upgrade-theme&theme=' . $theme;
                     $url = 'admin.php?page=wp-appstore.php&screen=theme-update&theme='. $theme ;
             
-            		$upgrader = new Theme_Upgrader( new WPAppstore_Theme_Upgrader_Skin( compact('title', 'nonce', 'url', 'theme') ) );
-            		$upgrader->upgrade($theme);
-                    unset($for_update[$theme]);
-                    update_option('wp_appstore_themes_for_update', $for_update);
+            		$upgrader = new WP_AppStore_Extension_Upgrader( new WPAppstore_Theme_Upgrader_Skin( compact('title', 'nonce', 'url', 'theme') ) );
+            		$upgrader->theme_upgrade($theme);
             }
             break;
         case 'force-update':
@@ -1278,6 +1288,7 @@ function wp_appstore_main() {
                 // $plugin here is 'folder/file.php', $plugin_slug is a slug.
                     $theme_id = $_GET['theme'];
                     $current = get_site_transient( 'update_themes' );
+                    $current = get_option('wp_appstore_plugins_for_update');
                     if (!is_object($current)) {
                         wp_update_themes();
                     }
@@ -1289,13 +1300,11 @@ function wp_appstore_main() {
                         $api = array();
                         $api['new_version'] = $theme_object->version;
                         $api['url'] = $theme_object->homepage;
-                        if (!$package = wp_appstore_prepare_package($theme_object->link, $theme_object->slug))
-                            $package = $theme_object->link;
-                        $api['package'] = $package;
+                        $api['package'] = $theme_object->link;
                         
-                        if (!isset($current->response[$theme])) {
-                            $current->response[$theme] = $api;
-                            set_site_transient('update_themes', $current);
+                        if (!isset($current[$theme])) {
+                            $current[$theme] = $api;
+                            update_option('wp_appstore_plugins_for_update', $current);
                         }
                     }else{
                         wp_die(__('Update failed'));
@@ -1306,51 +1315,46 @@ function wp_appstore_main() {
             		$submenu_file = 'themes.php';
             
             		$nonce = 'upgrade-theme_' . $theme;
-                    $url = 'admin.php?page=wp-appstore.php&screen=force-update&theme='. $theme_id ;
+                    $url = 'admin.php?page=wp-appstore.php&screen=force-update&theme='. $theme ;
             
-            		$upgrader = new Theme_Upgrader( new WPAppstore_Theme_Upgrader_Skin( compact('title', 'nonce', 'url', 'theme') ) );
-            		$upgrader->upgrade($theme);
+            		$upgrader = new WP_AppStore_Extension_Upgrader( new WPAppstore_Theme_Upgrader_Skin( compact('title', 'nonce', 'url', 'theme') ) );
+            		$upgrader->theme_upgrade($theme);
             }
             if(isset($_GET['autoupdate'])){
                 // include_once ABSPATH . 'wp-admin/includes/plugin-install.php'; //for plugins_api..
                 // check_admin_referer('install-plugin_' . $plugin);
                     $plugin_slug = 'wp-appstore';
                     $plugin = 'wp-appstore/wp-appstore.php';
-                    $current = get_site_transient( 'update_plugins' );
-                    if (!is_object($current)) {
-                        wp_update_plugins();
-                    }
+                    $current = get_option('wp_appstore_plugins_for_update');
                         $api = new StdClass;
                         $api->id = 1;
                         $api->slug = 'wp-appstore';
                         $api->new_version = 999;
                         $api->url = "http://github.com/bsn/wp-appstore";
-                        $download_url = "https://github.com/bsn/wp-appstore/zipball/master";
-                        if (!$package = wp_appstore_prepare_package($download_url, 'wp-appstore'))
-                            $package = $download_url;
-                        $api->package = $package;
-                        $current->response[$plugin] = $api;
-                        set_site_transient('update_plugins', $current);   
+                        $api->package = $download_url;
+                        $current[$plugin_slug]['file'] = $plugin;
+                        $current[$plugin_slug]['object'] = $api;
+                        $current[$plugin_slug]['title'] = 'WP Appstore';
+                        update_option('wp_appstore_plugins_for_update',$current);
                     
             		$title = sprintf( __('Update Plugin: %s'), 'WP Appstore');
                     
                     $parent_file = 'plugins.php';
                     $submenu_file = 'plugins.php';
-                    require_once(ABSPATH . 'wp-admin/admin-header.php');
                     
-            		$nonce = 'upgrade-plugin_' . $plugin;
-                    $url = 'admin.php?page=wp-appstore.php&screen=force-update&autoupdate=true' ;
+            		$nonce = 'upgrade-plugin_' . $plugin_slug;
 
-            		$upgrader = new Plugin_Upgrader( new WPAppstore_Plugin_Upgrader_Skin( compact('title', 'nonce', 'url', 'plugin') ) );
-            		$upgrader->upgrade($plugin);
-                    include(ABSPATH . 'wp-admin/admin-footer.php');
+            		$url = 'admin.php?page=wp-appstore.php&screen=force-update&plugin='. $plugin_slug ;
+
+            		$upgrader = new WP_AppStore_Extension_Upgrader( new WPAppstore_Plugin_Upgrader_Skin( compact('title', 'nonce', 'url', 'plugin_slug') ) );
+                    $upgrader->plugin_upgrade($plugin_slug);
             }
             if(isset($_GET['plugin']) && (intval($_GET['plugin']) > 0)){
                 // include_once ABSPATH . 'wp-admin/includes/plugin-install.php'; //for plugins_api..
                 // check_admin_referer('install-plugin_' . $plugin);
                 // $plugin here is 'folder/file.php', $plugin_slug is a slug.
                     $plugin_id = $_GET['plugin'];
-                    $current = get_site_transient( 'update_plugins' );
+                    $current = get_option('wp_appstore_plugins_for_update');
                     if (!is_object($current)) {
                         wp_update_plugins();
                     }
@@ -1364,14 +1368,14 @@ function wp_appstore_main() {
                         $api->slug = $plugin->slug;
                         $api->new_version = 999;
                         $api->url = $plugin->homepage;
-                        if (!$package = wp_appstore_prepare_package($plugin->link, $plugin->slug))
-                            $package = $plugin->link;
-                        $api->package = $package;
+                        $api->package = $plugin->link;
                         $string = wp_appstore_get_plugin_string_for_update($plugin->slug);
                         if(!$string)
                             wp_die(__('Update failed'));
-                        $current->response[$string] = $api;
-                        set_site_transient('update_plugins', $current);
+                        $current[$plugin->slug]['file'] = $string;
+                        $current[$plugin->slug]['object'] = $api;
+                        $current[$plugin->slug]['title'] = $plugin->title;
+                        update_option('wp_appstore_plugins_for_update',$current);
                         
                     }else{
                         wp_die(__('Update failed'));
@@ -1384,11 +1388,10 @@ function wp_appstore_main() {
                     
             		$nonce = 'upgrade-plugin_' . $plugin_slug;
 
-            		$url = 'admin.php?page=wp-appstore.php&screen=force-update&plugin='. $api->id ;
+            		$url = 'admin.php?page=wp-appstore.php&screen=force-update&plugin='. $plugin_slug ;
 
-            		$upgrader = new Plugin_Upgrader( new WPAppstore_Plugin_Upgrader_Skin( compact('title', 'nonce', 'url', 'plugin_slug') ) );
-                    //set_site_transient('update_plugins', $current);
-                    $upgrader->upgrade($string);
+            		$upgrader = new WP_AppStore_Extension_Upgrader( new WPAppstore_Plugin_Upgrader_Skin( compact('title', 'nonce', 'url', 'plugin_slug') ) );
+                    $upgrader->plugin_upgrade($plugin_slug);
             }
             if(isset($_GET['formulas'])){
                 update_option('wp_appstore_formulas_rescan', true);
@@ -1428,6 +1431,42 @@ function wp_appstore_main() {
             $msg = '<div class="updated" id="message"><p>Updated successfully</p></div>';
             wp_appstore_page_store($msg);
             break;
+  		case 'activate-bundle':
+			if ( ! current_user_can('activate_plugins') )
+				wp_die(__('You do not have sufficient permissions to activate plugins for this site.'));
+            if(isset($_GET['bundle'])){
+                $bundles = get_site_transient( 'wp_appstore_bundles' );
+                    if (isset($bundles[$_GET['bundle']])) {
+                        if (is_array($bundles[$_GET['bundle']]['plugins'])) {
+                            foreach($bundles[$_GET['bundle']]['plugins'] as $plugin){
+                                if($plugin['installed'])
+                                    continue;
+                                $plugins[] = wp_appstore_get_plugin_string_for_update($plugin['slug']);
+                            }
+                        }
+                    }
+            }
+
+            activate_plugins($plugins, self_admin_url('admin.php?page=wp-appstore.php'));
+
+			$recent = (array)get_option('recently_activated');
+			foreach ( $plugins as $plugin => $time)
+				if ( isset($recent[ $plugin ]) )
+					unset($recent[ $plugin ]);
+            delete_site_transient('wp_appstore_bundles');
+			update_option('recently_activated', $recent);
+            $msg = '<div class="updated" id="message"><p>Plugins installed and activated successfully</p></div>';
+            wp_appstore_page_store($msg);
+			break;
+        case 'prepare-bundle':
+			if ( ! current_user_can('install_plugins') )
+				wp_die(__('You do not have sufficient permissions to activate plugins for this site.'));
+            if(isset($_GET['bundle'])){
+                wp_appstore_wizard_prepare_bundle($_GET['bundle']);
+            }
+            else
+                wp_appstore_page_store();
+			break;
     }
 }
 function wp_appstore_request_filesystem_credentials($url, $type = '', $error = false, $context = false) {
@@ -1449,7 +1488,12 @@ function wp_appstore_check_for_force_formulas_update() {
     }
 }
 function wp_appstore_myaccount() {
-   //var_dump(get_posts());
+   /*$appstore = new WP_AppStore();
+   $appstore->read_bundles();
+   $upgrader = new WP_AppStore_Extension_Upgrader( new WP_AppStore_Bundle_Installer_Skin( compact('title', 'url', 'nonce', 'plugin', 'api') ) );
+    $upgrader->bundle_install('base-bundle');*/
+    //var_dump(get_option('recently_activated'));
+    wp_appstore_wizard_bundles();
 }
 function icon_path($item_object){
     if (strlen($item_object->icon) < 5)
