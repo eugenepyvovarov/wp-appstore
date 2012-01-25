@@ -159,3 +159,25 @@ input#search-submit {
    float: right;
    margin: 12px 15px 0px 0px;
 }
+.bundles-list {
+	list-style:none;
+	width:400px;
+}
+	.bundles-list li{
+		
+	}
+	.bundles-list li a{
+		display:block;
+		text-align: right;
+		padding:25px 15px;
+		border:1px solid #efefef;
+		font-size:19px;
+		background:#fff;
+		-o-transition:background-color 250ms linear;
+		-webkit-transition:background-color 250ms linear;
+	}
+	.bundles-list li a:hover{
+		background:#f1f1f1;
+		-o-transition:background-color 250ms linear;
+		-webkit-transition:background-color 250ms linear;
+	}

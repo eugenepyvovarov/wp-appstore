@@ -7,7 +7,7 @@
 
 function wp_appstore_wizard_bundles() {
     $bundles = get_site_transient('wp_appstore_bundles');
-    $list = '<ul>';
+    $list = '<ul class="bundles-list">';
     if(is_array($bundles))
         $bundles_names = array_keys($bundles);
         
@@ -27,6 +27,8 @@ function wp_appstore_wizard_bundles() {
             <a href="http://wp-appstore.com/" target="_blank"><img src="<?php echo plugins_url( 'images/rss.png', __FILE__ ); ?>" alt="" /></a>
             </span>
 		</h2>
+		<p>Install all best plugins for your website in one click</p>
+		<h2>Select type of your website</h2>
         <?php echo $list; ?>
     </div>
     <?php
