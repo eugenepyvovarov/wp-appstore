@@ -31,6 +31,7 @@ function wp_appstore_admin_init() {
 }
 function wp_appstore_admin_menu() {
     add_menu_page( 'WP Appstore', 'WP AppStore', 'manage_options', basename( __FILE__ ), 'wp_appstore_main', null, 61 );
+    add_submenu_page( basename( __FILE__ ), 'Featured and Lastest', 'Featured and Lastest', 'manage_options', basename( __FILE__ ).'&screen=store', 'wp_appstore_main' );
     add_submenu_page( basename( __FILE__ ), 'All Plugins', 'All Plugins', 'manage_options', basename( __FILE__ ).'&screen=all-plugins', 'wp_appstore_main' );
     add_submenu_page( basename( __FILE__ ), 'All Themes', 'All Themes', 'manage_options', basename( __FILE__ ).'&screen=all-themes', 'wp_appstore_main' );
     add_submenu_page( basename( __FILE__ ), 'Installed', 'Installed', 'manage_options', basename( __FILE__ ).'&screen=installed', 'wp_appstore_main' );
@@ -924,7 +925,7 @@ Please enter your email below and we will notify you when you can download an up
 }
 
 function wp_appstore_main() {
-    $pages = array('store', 'search', 'tag-filter', 'all-plugins', 'all-themes', 'view-plugin', 'view-theme', 'install-plugin', 'install-theme', 'autoupdate', 'plugin-update', 'theme-update', 'installed', 'featured-plugins', 'featured-themes', 'force-formulas-update', 'force-update', 'myacc', 'activate-bundle', 'wizard', 'prepare-bundle');
+    $pages = array('store', 'search', 'tag-filter', 'all-plugins', 'all-themes', 'view-plugin', 'view-theme', 'install-plugin', 'install-theme', 'autoupdate', 'plugin-update', 'theme-update', 'installed', 'featured-plugins', 'featured-themes', 'force-formulas-update', 'force-update', 'myacc', 'activate-bundle', 'wizard', 'show-bundle', 'prepare-bundle');
     $page = '';
     if (isset($_REQUEST['prepared-bundle'])) {
         $bundles = get_site_transient('wp_appstore_bundles');
@@ -972,7 +973,7 @@ function wp_appstore_main() {
         exit;
     }
     if(!isset($_GET['screen']) || !in_array($_GET['screen'],$pages)){
-        $page = 'store';
+        $page = 'wizard';
     } else {
         $page = $_GET['screen'];
     }
@@ -981,6 +982,7 @@ function wp_appstore_main() {
             wp_appstore_page_store();
             break;
         case 'myacc':
+            #wp_appstore_page_store();
             wp_appstore_myaccount();
             break;
         case 'wizard':
@@ -1467,6 +1469,15 @@ function wp_appstore_main() {
             else
                 wp_appstore_page_store();
 			break;
+        case 'show-bundle':
+			if ( ! current_user_can('install_plugins') )
+				wp_die(__('You do not have sufficient permissions to activate plugins for this site.'));
+            if(isset($_GET['bundle'])){
+                wp_appstore_wizard_show_bundle($_GET['bundle']);
+            }
+            else
+                wp_appstore_page_store();
+			break;
     }
 }
 function wp_appstore_request_filesystem_credentials($url, $type = '', $error = false, $context = false) {
@@ -1493,7 +1504,7 @@ function wp_appstore_myaccount() {
    $upgrader = new WP_AppStore_Extension_Upgrader( new WP_AppStore_Bundle_Installer_Skin( compact('title', 'url', 'nonce', 'plugin', 'api') ) );
     $upgrader->bundle_install('base-bundle');*/
     //var_dump(get_option('recently_activated'));
-    wp_appstore_wizard_bundles();
+    //wp_appstore_wizard_bundles();
 }
 function icon_path($item_object){
     if (strlen($item_object->icon) < 5)

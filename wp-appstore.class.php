@@ -780,6 +780,7 @@ class WP_AppStore{
                     if ($bl = parse_ini_file("{$this->bundle_dir}/$file")) {
                     $out[$bl['slug']]['name'] = $bl['name'];
                     $out[$bl['slug']]['description'] = $bl['description'];
+                    $out[$bl['slug']]['order'] = $bl['order'];
                     if(is_array($bl['plugin']))
                     foreach ($bl['plugin'] as $plugin) {
                             $query = $wpdb->prepare(
